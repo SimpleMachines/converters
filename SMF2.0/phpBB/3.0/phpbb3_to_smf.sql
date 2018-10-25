@@ -553,8 +553,14 @@ SELECT
 	IFNULL(m.user_email, 'Unknown') AS poster_email,
 	IFNULL(p.poster_ip, '0.0.0.0') AS poster_ip,
 	p.enable_smilies AS smileys_enabled, p.post_edit_time AS modified_time,
-	CASE p.post_edit_user WHEN 0 THEN 'Guest' ELSE m2.username END AS modified_name,
-	p.post_text AS body
+	 p.post_text AS body,
+	        (
+	            CASE
+	                WHEN p.post_edit_user = 0 THEN 'Guest'
+	                WHEN m2.username IS NULL THEN 'Guest'
+	                ELSE m2.username
+	            END
+        ) AS modified_name
 FROM {$from_prefix}posts AS p
 	LEFT JOIN {$from_prefix}users AS m ON (m.user_id = p.poster_id)
 	LEFT JOIN {$from_prefix}users AS m2 ON (m2.user_id = p.post_edit_user);
