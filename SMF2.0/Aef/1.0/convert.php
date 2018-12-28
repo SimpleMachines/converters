@@ -2153,7 +2153,7 @@ function template_convert_above()
 	global $convert_data, $time_start, $current_step, $last_step;
 
 	$time_start = time();
-	$smfsite = 'http://simplemachines.org/smf';
+	$smfsite = 'https://simplemachines.org/smf';
 
 	$current_action = '';
 	$mainsteps = findSteps();
