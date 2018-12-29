@@ -78,6 +78,12 @@ function initialize_inputs()
 		@ini_set('session.save_handler', 'files');
 	@session_start();
 
+	// Check session path is writable
+	$session_path = @ini_get('session.save_handler');
+	// If not lets try another place just for the conversion...
+	if (!is_writable($session_path))
+		@ini_set('session.save_path', dirname(__FILE__) . '/cache');
+
 	// Add slashes, as long as they aren't already being added.
 	if (function_exists('get_magic_quotes_gpc') && @get_magic_quotes_gpc() != 0)
 		$_POST = convert_stripslashes_recursive($_POST);
@@ -476,7 +482,16 @@ function loadSettings()
 	// Attempt to allow big selects, only for mysql so far though.
 	if ($smcFunc['db_title'] == 'MySQL')
 	{
-		$results = $smcFunc['db_query']('', "SELECT @@SQL_BIG_SELECTS, @@SQL_MAX_JOIN_SIZE", 'security_override');
+
+		// Fix MySQL 5.6 variable name change
+		$max_join_var_name = 'SQL_MAX_JOIN_SIZE';
+
+		$mysql_version = $smcFunc['db_server_info']($db_connection);
+
+		if (version_compare($mysql_version, '5.6.0') >= 0)
+			$max_join_var_name = 'max_join_size';
+
+		$results = $smcFunc['db_query']('', "SELECT @@SQL_BIG_SELECTS, @@$max_join_var_name", 'security_override');
 		list($big_selects, $sql_max_join) = $smcFunc['db_fetch_row']($results);
 
 		// Only waste a query if its worth it.
@@ -485,7 +500,7 @@ function loadSettings()
 
 		// Lets set MAX_JOIN_SIZE to something we should
 		if (empty($sql_max_join) || ($sql_max_join == '18446744073709551615' && $sql_max_join == '18446744073709551615'))
-			$smcFunc['db_query']('', "SET @@SQL_MAX_JOIN_SIZE = 18446744073709551615", 'security_override');
+			$smcFunc['db_query']('', "SET @@$max_join_var_name = 18446744073709551615", 'security_override');
 	}
 
 	// Since we use now the attachment functions in Subs.php, we'll need this:
@@ -2388,7 +2403,7 @@ function convert_stripslashes_recursive($var, $level = 0)
 // The main convert function that does all the big daddy work.
 function convert_query($string, $return_error = false)
 {
-	global $convert_dbs, $to_prefix, $command_line, $smcFunc;
+	global $convert_dbs, $to_prefix, $command_line, $smcFunc, $db_connection;
 
 	// Debugging?
 	if (isset($_REQUEST['debug']))
@@ -2496,8 +2511,9 @@ function convert_query($string, $return_error = false)
 
 	if (empty($not_smf_dbs))
 	{
-		$db_error = $smcFunc['db_error']();
-		$db_errno = $smcFunc['db_title'] == 'MySQL' ? mysql_errno() : ($smcFunc['db_title'] == 'SQLite' ? sqlite_last_error() : ($smcFunc['db_title'] == 'PostgreSQL' ? pg_last_error() : $smcFunc['db_error']()));
+
+		$db_error = $smcFunc['db_error']($db_connection);
+		$db_errno = $smcFunc['db_title'] == 'MySQL' ? (function_exists('mysqli_errno') ? mysqli_errno($db_connection) : mysql_errno($db_connection)) : ($smcFunc['db_title'] == 'SQLite' ? sqlite_last_error() : ($smcFunc['db_title'] == 'PostgreSQL' ? pg_last_error() : $smcFunc['db_error']($db_connection)));
 
 		// FIrst log it.
 		// In the future this may return the actual file it came from.
@@ -2530,7 +2546,17 @@ function convert_query($string, $return_error = false)
 		// Attempt to allow big selects, only for mysql so far though.
 		if ($smcFunc['db_title'] == 'MySQL' && (trim($db_errno) == 1104 || strpos($db_error, 'use SET SQL_BIG_SELECTS=1') !== false))
 		{
-			$results = $smcFunc['db_query']('', "SELECT @@SQL_BIG_SELECTS, @SQL_MAX_JOIN_SIZE", 'security_override');
+			$mysql_version = $smcFunc['db_server_info']($db_connection);
+
+			// Fix MySQL 5.6 variable name change
+			$max_join_var_name = 'SQL_MAX_JOIN_SIZE';
+
+			$mysql_version = $smcFunc['db_server_info']($db_connection);
+
+			if (version_compare($mysql_version, '5.6.0') >= 0)
+				$max_join_var_name = 'max_join_size';
+
+			$results = $smcFunc['db_query']('', "SELECT @@SQL_BIG_SELECTS, @$max_join_var_name", 'security_override');
 			list($big_selects, $sql_max_join) = $smcFunc['db_fetch_row']($results);
 
 			// Only waste a query if its worth it.
@@ -2538,8 +2564,8 @@ function convert_query($string, $return_error = false)
 				$smcFunc['db_query']('', "SET @@SQL_BIG_SELECTS = 1", 'security_override');
 
 			// Lets set MAX_JOIN_SIZE to something we should
-			if (empty($sql_max_join) || ($sql_max_join == '18446744073709551615' && sql_max_join == '18446744073709551615'))
-				$smcFunc['db_query']('', "SET @@SQL_MAX_JOIN_SIZE = 18446744073709551615", 'security_override');
+			if (empty($sql_max_join) || ($sql_max_join == '18446744073709551615' && $sql_max_join == '18446744073709551615'))
+				$smcFunc['db_query']('', "SET @@$max_join_var_name = 18446744073709551615", 'security_override');
 
 			// Try again.
 			$result = $smcFunc['db_query']('', $string, 'security_override');
@@ -2690,24 +2716,28 @@ function convert_result($request, $offset = 0, $field_name = '')
 	elseif ($smcFunc['db_title'] == 'PostgreSQL')
 		return pg_fetch_result($request, $offset, $field_name);
 	else
-		return mysql_result($request, $offset, $field_name);
+	{
+		if (function_exists("mysqli_connect"))
+			return convert_mysqli_result($request, $offset, $field_name);
+		else
+			return mysql_result($request, $offset, $field_name);
+	}
+
+}
+
+function convert_mysqli_result($request, $offset,  $field_name)
+{
+    $request->data_seek($offset);
+
+    $row = $request->fetch_array();
+
+	return $row[$field_name];
 }
 
 function convert_free_result($result)
 {
 	global $smcFunc;
 
-	// ADO?
-	if (!is_resource($result) && is_object($result))
-	{
-		$result->Close();
-		return;
-	}
-
-	$type = get_resource_type($result);
-	if ($type == 'odbc result')
-		return odbc_free_result($result);
-	else
 		return $smcFunc['db_free_result']($result);
 }
 
@@ -2715,28 +2745,6 @@ function convert_fetch_assoc($result)
 {
 	global $smcFunc;
 
-	// Okay, the hardest is ADO (Windows only, by the way.)
-	if (!is_resource($result) && is_object($result))
-	{
-		if ($result->EOF)
-			return false;
-
-		$row = array();
-		$fields = $result->Fields;
-		for ($i = 0, $n = $fields->Count; $i < $n; $i++)
-		{
-			$field = $fields[$i];
-			$row[$field->Name] = $field->Value;
-		}
-		$result->MoveNext();
-
-		return $row;
-	}
-
-	$type = get_resource_type($result);
-	if ($type == 'odbc result')
-		return odbc_fetch_array($result);
-	else
 		return $smcFunc['db_fetch_assoc']($result);
 }
 
@@ -2744,24 +2752,6 @@ function convert_fetch_row($result)
 {
 	global $smcFunc;
 
-	if (!is_resource($result) && is_object($result))
-	{
-		if ($result->EOF)
-			return false;
-
-		$row = array();
-		$fields = $result->Fields;
-		for ($i = 0, $n = $fields->Count; $i < $n; $i++)
-			$row[] = $fields[$i]->Value;
-		$result->MoveNext();
-
-		return $row;
-	}
-
-	$type = get_resource_type($result);
-	if ($type == 'odbc_result')
-		return array_values(odbc_fetch_array($result));
-	else
 		return $smcFunc['db_fetch_row']($result);
 }
 
@@ -2769,16 +2759,6 @@ function convert_num_rows($result)
 {
 	global $smcFunc;
 
-	if (!is_resource($result) && is_object($result))
-	{
-		$fields = $result->Fields;
-		return $fields->Count;
-	}
-
-	$type = get_resource_type($result);
-	if ($type == 'odbc result')
-		return odbc_num_rows($result);
-	else
 		return $smcFunc['db_num_rows']($result);
 }
 
@@ -2823,7 +2803,7 @@ function alterDatabase($table, $type, $parms, $no_prefix = false)
 
 		// Since SMF 1.1 used camel case in its ids. Lets try to detect that.
 		// Best we can do is only do this for mysql users. Sorry mates.
-		if ($smcFunc['db_title'] == 'MySQL' && $parms != strtolower($parms) && strtolower(substr(parms, 0, 2)) != 'id')
+		if ($smcFunc['db_title'] == 'MySQL' && $parms != strtolower($parms) && strtolower(substr($parms, 0, 2)) != 'id')
 		{
 			$count = count($parms);
 			$i = 0;
@@ -2838,11 +2818,11 @@ function alterDatabase($table, $type, $parms, $no_prefix = false)
 			$smcFunc['db_remove_index']($table, $parms, $extra_parms);
 		}
 		// Its an id column, which is easier.
-		elseif ($smcFunc['db_title'] == 'MySQL' && $parms != strtolower($parms) && strtolower(substr(parms, 0, 2)) == 'id')
+		elseif ($smcFunc['db_title'] == 'MySQL' && $parms != strtolower($parms) && strtolower(substr($parms, 0, 2)) == 'id')
 			$smcFunc['db_remove_index']($table, strtolower($parms), $extra_parms);
 	}
 	else
-		print_error('Unkown type called in alterDatabase.' . var_dump(function_exists('debug_backtrace') ? debug_backtrace() : 'Unable to backtrace'));
+		print_error('Unknown type called in alterDatabase.' . var_dump(function_exists('debug_backtrace') ? debug_backtrace() : 'Unable to backtrace'));
 }
 
 // This function is depcreated, but we will provide it for legacy reasons for now.
