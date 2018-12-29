@@ -13,12 +13,6 @@
 --- Converting members...
 /******************************************************************************/
 
----{
-/* fix invalid birthdates */
-if(!preg_match('/\d{4}-\d{2}-\d{2}/', $row['birthdate']))
-	$row['birthdate'] = '0001-01-01';
----}
-
 TRUNCATE {$to_prefix}members;
 ALTER TABLE {$to_prefix}members
 CHANGE COLUMN password_salt password_salt varchar(8) NOT NULL default '';
