@@ -22,10 +22,15 @@ CHANGE COLUMN password_salt password_salt varchar(8) NOT NULL default '';
 ---* {$to_prefix}members
 ---{
 if (!filter_var($row['member_ip'], FILTER_VALIDATE_IP))
-	$row['member_ip'] = inet_ntop($row['member_ip']);
+	$row['member_ip'] = @inet_ntop($row['member_ip']);
 	
 if (!filter_var($row['member_ip2'], FILTER_VALIDATE_IP))	
-	$row['member_ip2'] = inet_ntop($row['member_ip2']);
+	$row['member_ip2'] = @inet_ntop($row['member_ip2']);
+	
+$context['utf8'] = true;
+$context['server']['complex_preg_chars'] = false;
+$row['real_name'] = trim(preg_replace('~[\t\n\r \x0B\0' . ($context['utf8'] ? ($context['server']['complex_preg_chars'] ? '\x{A0}\x{AD}\x{2000}-\x{200F}\x{201F}\x{202F}\x{3000}\x{FEFF}' : "\xC2\xA0\xC2\xAD\xE2\x80\x80-\xE2\x80\x8F\xE2\x80\x9F\xE2\x80\xAF\xE2\x80\x9F\xE3\x80\x80\xEF\xBB\xBF") : '\x00-\x08\x0B\x0C\x0E-\x19\xA0') . ']+~' . ($context['utf8'] ? 'u' : ''), ' ', $row['real_name']));
+	
 ---}
 SELECT
 	uid AS id_member, SUBSTRING(username, 1, 255) AS member_name,
