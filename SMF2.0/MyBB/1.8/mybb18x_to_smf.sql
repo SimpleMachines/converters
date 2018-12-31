@@ -13,11 +13,20 @@
 --- Converting members...
 /******************************************************************************/
 
+
+
 TRUNCATE {$to_prefix}members;
 ALTER TABLE {$to_prefix}members
 CHANGE COLUMN password_salt password_salt varchar(8) NOT NULL default '';
 
 ---* {$to_prefix}members
+---{
+if (!filter_var($row['member_ip'], FILTER_VALIDATE_IP))
+	$row['member_ip'] = inet_ntop($row['member_ip']);
+	
+if (!filter_var($row['member_ip2'], FILTER_VALIDATE_IP))	
+	$row['member_ip2'] = inet_ntop($row['member_ip2']);
+---}
 SELECT
 	uid AS id_member, SUBSTRING(username, 1, 255) AS member_name,
 	SUBSTRING(username, 1, 255) AS real_name, email AS email_address,
@@ -30,7 +39,9 @@ SELECT
 	SUBSTRING(buddylist, 1, 255) AS buddy_list,
 	SUBSTRING(regip, 1, 255) AS member_ip, SUBSTRING(regip, 1, 255) AS member_ip2,
 	SUBSTRING(ignorelist, 1, 255) AS pm_ignore_list,
-	timeonline AS total_time_logged_in
+	timeonline AS total_time_logged_in,
+	'' AS message_labels, '' AS openid_uri, '' AS location, '' AS avatar, '' AS personal_text,
+	'' AS secret_question, '' AS ignore_boards, '' AS additional_groups 
 FROM {$from_prefix}users;
 ---*
 
@@ -101,9 +112,11 @@ HAVING id_first_msg != 0
 TRUNCATE {$to_prefix}messages;
 TRUNCATE {$to_prefix}attachments;
 
+
 ---* {$to_prefix}messages 200
 ---{
 $ignore_slashes = true;
+$row['poster_ip'] = inet_ntop($row['poster_ip']);
 ---}
 SELECT
 	p.pid AS id_msg, p.tid AS id_topic, t.fid AS id_board, p.uid AS id_member,
