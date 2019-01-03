@@ -27,7 +27,7 @@ if (!filter_var($row['member_ip'], FILTER_VALIDATE_IP))
 if (!filter_var($row['member_ip2'], FILTER_VALIDATE_IP))	
 	$row['member_ip2'] = @inet_ntop($row['member_ip2']);
 	
-$context['utf8'] = true;
+$context['utf8'] = false;
 $context['server']['complex_preg_chars'] = false;
 $row['real_name'] = trim(preg_replace('~[\t\n\r \x0B\0' . ($context['utf8'] ? ($context['server']['complex_preg_chars'] ? '\x{A0}\x{AD}\x{2000}-\x{200F}\x{201F}\x{202F}\x{3000}\x{FEFF}' : "\xC2\xA0\xC2\xAD\xE2\x80\x80-\xE2\x80\x8F\xE2\x80\x9F\xE2\x80\xAF\xE2\x80\x9F\xE3\x80\x80\xEF\xBB\xBF") : '\x00-\x08\x0B\x0C\x0E-\x19\xA0') . ']+~' . ($context['utf8'] ? 'u' : ''), ' ', $row['real_name']));
 	
@@ -121,7 +121,7 @@ TRUNCATE {$to_prefix}attachments;
 ---* {$to_prefix}messages 200
 ---{
 $ignore_slashes = true;
-$row['poster_ip'] = inet_ntop($row['poster_ip']);
+$row['poster_ip'] = @inet_ntop($row['poster_ip']);
 ---}
 SELECT
 	p.pid AS id_msg, p.tid AS id_topic, t.fid AS id_board, p.uid AS id_member,
