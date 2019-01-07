@@ -488,7 +488,7 @@ function loadSettings()
 
 		$mysql_version = $smcFunc['db_server_info']($db_connection);
 
-		if (version_compare($mysql_version, '5.6.0') >= 0)
+		if (stripos($mysql_version,"MariaDB") > 0 ||  version_compare($mysql_version, '5.6.0') >= 0)
 			$max_join_var_name = 'max_join_size';
 
 		$results = $smcFunc['db_query']('', "SELECT @@SQL_BIG_SELECTS, @@$max_join_var_name", 'security_override');
@@ -2123,7 +2123,8 @@ function doStep3()
 		array('variable', 'value'),
 		array(
 			array('conversion_time', time()),
-			array('conversion_from', $_SESSION['convert_script'])
+			array('conversion_from', $_SESSION['convert_script']),
+			array('enable_password_conversion', 1)
 		),'replace');
 
 	$current_step = 3;
@@ -2553,7 +2554,7 @@ function convert_query($string, $return_error = false)
 
 			$mysql_version = $smcFunc['db_server_info']($db_connection);
 
-			if (version_compare($mysql_version, '5.6.0') >= 0)
+			if (stripos($mysql_version,"MariaDB") > 0 ||  version_compare($mysql_version, '5.6.0') >= 0)
 				$max_join_var_name = 'max_join_size';
 
 			$results = $smcFunc['db_query']('', "SELECT @@SQL_BIG_SELECTS, @$max_join_var_name", 'security_override');

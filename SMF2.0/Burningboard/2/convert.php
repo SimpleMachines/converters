@@ -2123,7 +2123,8 @@ function doStep3()
 		array('variable', 'value'),
 		array(
 			array('conversion_time', time()),
-			array('conversion_from', $_SESSION['convert_script'])
+			array('conversion_from', $_SESSION['convert_script']),
+			array('enable_password_conversion', 1)
 		),'replace');
 
 	$current_step = 3;
