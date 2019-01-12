@@ -39,7 +39,7 @@ if ($row['min_posts'] > -1)
 ---}
 SELECT
 	SUBSTRING(CONCAT('phpBB ', rank_title), 1, 255) AS group_name,
-	rank_image AS stars, IF(rank_special = 0, rank_min, -1) AS min_posts,
+	rank_image AS stars, '' AS description, IF(rank_special = 0, rank_min, -1) AS min_posts,
 	'' AS online_color
 FROM {$from_prefix}ranks
 ORDER BY rank_min;
@@ -52,7 +52,7 @@ ORDER BY rank_min;
 ---* {$to_prefix}membergroups
 SELECT
 	SUBSTRING(CONCAT('phpBB ', group_name), 1, 255) AS group_name,
-	-1 AS min_posts, '' AS stars, group_colour AS online_color
+	-1 AS min_posts, '' AS stars, '' AS description, group_colour AS online_color
 FROM {$from_prefix}groups
 WHERE group_id NOT IN (1, 6);
 ---*
