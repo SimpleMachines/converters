@@ -201,12 +201,107 @@ TRUNCATE {$to_prefix}attachments;
 ---* {$to_prefix}messages
 ---{
 $ignore = true;
-/*
-$row['body'] = preg_replace('~\[quote name=(.+?) timestamp=(.+?) post=(.+?)\]~ie', '\'[quote author=\' . substr(\'$1\', 5, -5) . \' link=topic=\'. $row[\'id_topic\'].\'.msg\' . substr(\'$3\', 5, -5) . \'#msg\' . substr(\'$3\', 5, -5) . \' date=\' . substr(\'$2\', 5, -5) . \']\'', $row['body']);
-$row['body'] = preg_replace("~<img .*?bbc_emoticon' alt='(.+?)' />~ie", '\'$1\'', $row['body']);
-$row['body'] = preg_replace("~<img .*?emoid=\"(.+?)\".*?/>~ie", '\'$1\'', $row['body']);
 
-*/
+
+//$row['body'] = stripslashes($row['body']);
+
+// Citation remove
+$row['body'] = preg_replace('/<div class="ipsQuote\_citation">(.*)<\/div>/isU', '', $row['body']);
+
+
+preg_match_all('/<blockquote(.*) data\-ipsquote\-timestamp="(.*)" data\-ipsquote\-userid="(.*)" data\-ipsquote\-username="(.*)">/i', $row['body'], $quotes);
+
+if (!empty($quotes[0]))
+foreach($quotes[0] as $key => $match)
+{
+	$row['body'] = str_replace($match,'[quote author=' .  $quotes[4][$key] . ' date=' .  $quotes[2][$key] . ']'  ,$row['body']);
+}
+
+
+
+
+preg_match_all('/<blockquote(.*) data\-ipsquote\-username="(.*)" (.*) data\-ipsquote\-timestamp="(.*)">/i', $row['body'], $quotes);
+
+if (!empty($quotes[0]))
+foreach($quotes[0] as $key => $match)
+{
+	$row['body'] = str_replace($match,'[quote author=' .  $quotes[2][$key] . ' date=' .  $quotes[4][$key] . ']'  ,$row['body']);
+}
+
+
+
+
+$row['body'] = str_replace("<span>","",$row['body']);
+$row['body'] = str_replace("</span>","",$row['body']);
+
+$row['body'] = str_replace("</div>","",$row['body']);
+$row['body'] = str_replace('<div class="ipsEmbeddedOther">',"",$row['body']);
+
+
+// Mention remove
+preg_match_all('/<a (.*) data\-mentionid="(.*)" (.*) rel="">(.*)<\/a>/i', $row['body'], $mentions);
+if (!empty($mentions[0]))
+foreach($mentions[0] as $key => $match)
+{
+	$row['body'] = str_replace($match,$mentions[4][$key],$row['body']);
+}
+
+
+
+$row['body'] = str_replace('</blockquote>',"[/quote]",$row['body']);
+
+
+//$row['body'] = str_replace('<div class="ipsQuote_contents">',"",$row['body']);
+
+$row['body'] = preg_replace('/<div class="ipsQuote_content(.*)">/isU', '', $row['body']);
+$row['body'] = preg_replace('/<p style="(.*)">/isU', '', $row['body']);
+$row['body'] = preg_replace('/<span style="(.*)">/isU', '', $row['body']);
+
+// Remove emoticions
+$row['body'] = preg_replace('/<img (.*) data-emoticon="(.*)" \/>/i', '', $row['body']);
+$row['body'] = preg_replace('/<img (.*) data-emoticon="(.*)">/i', '', $row['body']);
+$row['body'] = preg_replace('/<img (.*) data-emoticon="true" (.*) \/>/i', '', $row['body']);
+$row['body'] = preg_replace('/<img (.*) data-emoticon="true" (.*)">/i', '', $row['body']);
+
+$row['body'] = preg_replace('/<img (.*)<fileStore(.*)">/i', '', $row['body']);
+
+
+
+$row['body'] = str_replace("<div>","",$row['body']);
+
+// Media embeding
+preg_match_all('/<iframe (.*) src="(.*)" (.*)"><\/iframe>/i', $row['body'], $iframes);
+
+if (!empty($iframes[0]))
+foreach($iframes[0] as $key => $match)
+{
+	$tmp = explode("amp;url=",$iframes[2][$key]);
+
+	if (!empty($tmp[1]))
+	$row['body'] = str_replace($match,$tmp[1],$row['body']);
+
+}
+
+
+
+
+
+$row['body'] = str_replace("<p>","",$row['body']);
+$row['body'] = str_replace("</p>","",$row['body']);
+
+$row['body'] = str_replace("\n\n\n","\n \n",$row['body']);
+
+$row['body'] = str_replace("\n\n","\n",$row['body']);
+
+
+//$row['body'] = addslashes($row['body']);
+
+$row['body'] = str_replace("\n\t","\n",$row['body']);
+$row['body'] = trim($row['body']);
+
+
+
+
 ---}
 SELECT
 	p.pid AS id_msg, p.topic_id AS id_topic, p.post_date AS poster_time,
@@ -331,11 +426,113 @@ TRUNCATE {$to_prefix}personal_messages;
 ---* {$to_prefix}personal_messages
 ---{
 $ignore = true;
-/*
-$row['body'] = preg_replace('~\[quote name=(.+?) timestamp=(.+?) post=(.+?)\]~ie', '\'[quote author=\' . substr(\'$1\', 5, -5) . \' link=topic=\'. $row[\'id_topic\'].\'.msg\' . substr(\'$3\', 5, -5) . \'#msg\' . substr(\'$3\', 5, -5) . \' date=\' . substr(\'$2\', 5, -5) . \']\'', $row['body']);
-$row['body'] = preg_replace("~<img .*?bbc_emoticon' alt='(.+?)' />~ie", '\'$1\'', $row['body']);
-$row['body'] = preg_replace("~<img .*?emoid=\"(.+?)\".*?/>~ie", '\'$1\'', $row['body']);
-*/
+
+
+
+//$row['body'] = stripslashes($row['body']);
+
+// Citation remove
+$row['body'] = preg_replace('/<div class="ipsQuote\_citation">(.*)<\/div>/isU', '', $row['body']);
+
+
+preg_match_all('/<blockquote(.*) data\-ipsquote\-timestamp="(.*)" data\-ipsquote\-userid="(.*)" data\-ipsquote\-username="(.*)">/i', $row['body'], $quotes);
+
+if (!empty($quotes[0]))
+foreach($quotes[0] as $key => $match)
+{
+	$row['body'] = str_replace($match,'[quote author=' .  $quotes[4][$key] . ' date=' .  $quotes[2][$key] . ']'  ,$row['body']);
+}
+
+
+
+
+preg_match_all('/<blockquote(.*) data\-ipsquote\-username="(.*)" (.*) data\-ipsquote\-timestamp="(.*)">/i', $row['body'], $quotes);
+
+if (!empty($quotes[0]))
+foreach($quotes[0] as $key => $match)
+{
+	$row['body'] = str_replace($match,'[quote author=' .  $quotes[2][$key] . ' date=' .  $quotes[4][$key] . ']'  ,$row['body']);
+}
+
+
+
+
+$row['body'] = str_replace("<span>","",$row['body']);
+$row['body'] = str_replace("</span>","",$row['body']);
+
+$row['body'] = str_replace("</div>","",$row['body']);
+$row['body'] = str_replace('<div class="ipsEmbeddedOther">',"",$row['body']);
+
+
+// Mention remove
+preg_match_all('/<a (.*) data\-mentionid="(.*)" (.*) rel="">(.*)<\/a>/i', $row['body'], $mentions);
+if (!empty($mentions[0]))
+foreach($mentions[0] as $key => $match)
+{
+	$row['body'] = str_replace($match,$mentions[4][$key],$row['body']);
+}
+
+
+
+$row['body'] = str_replace('</blockquote>',"[/quote]",$row['body']);
+
+
+//$row['body'] = str_replace('<div class="ipsQuote_contents">',"",$row['body']);
+
+$row['body'] = preg_replace('/<div class="ipsQuote_content(.*)">/isU', '', $row['body']);
+$row['body'] = preg_replace('/<p style="(.*)">/isU', '', $row['body']);
+$row['body'] = preg_replace('/<span style="(.*)">/isU', '', $row['body']);
+
+// Remove emoticions
+$row['body'] = preg_replace('/<img (.*) data-emoticon="(.*)" \/>/i', '', $row['body']);
+$row['body'] = preg_replace('/<img (.*) data-emoticon="(.*)">/i', '', $row['body']);
+$row['body'] = preg_replace('/<img (.*) data-emoticon="true" (.*) \/>/i', '', $row['body']);
+$row['body'] = preg_replace('/<img (.*) data-emoticon="true" (.*)">/i', '', $row['body']);
+
+$row['body'] = preg_replace('/<img (.*)<fileStore(.*)">/i', '', $row['body']);
+
+
+
+$row['body'] = str_replace("<div>","",$row['body']);
+
+// Media embeding
+preg_match_all('/<iframe (.*) src="(.*)" (.*)"><\/iframe>/i', $row['body'], $iframes);
+
+if (!empty($iframes[0]))
+foreach($iframes[0] as $key => $match)
+{
+	$tmp = explode("amp;url=",$iframes[2][$key]);
+
+
+	$row['body'] = str_replace($match,$tmp[1],$row['body']);
+
+}
+
+
+
+
+
+
+
+$row['body'] = str_replace("<p>","",$row['body']);
+$row['body'] = str_replace("</p>","",$row['body']);
+
+$row['body'] = str_replace("\n\n\n","\n \n",$row['body']);
+
+$row['body'] = str_replace("\n\n","\n",$row['body']);
+
+
+
+$row['body'] = str_replace("\n\t","\n",$row['body']);
+
+//$row['body'] = addslashes($row['body']);
+
+$row['body'] = trim($row['body']);
+
+
+
+
+
 ---}
 SELECT
 	pm.msg_id AS id_pm, pm.msg_author_id AS id_member_from, pm.msg_date AS msgtime,
@@ -359,6 +556,7 @@ TRUNCATE {$to_prefix}pm_recipients;
 
 ---* {$to_prefix}pm_recipients
 ---{
+$ignore = true;
 $no_add = true;
 $keys = array('id_pm', 'id_member', 'labels', 'is_read');
 $invited_members = @unserialize($row['invited_members']);
@@ -640,7 +838,7 @@ if (strlen($smf_avatar_filename) <= 255 && copy($ipb_avatar, $avatar_dir . '/' .
 ---}
 SELECT member_id AS id_member, pp_main_photo AS filename, pp_main_width as width, pp_main_height as height 
 FROM {$from_prefix}core_members
-
+where pp_main_photo != '';
 ---*
 
 /******************************************************************************/
@@ -701,18 +899,6 @@ while ($row = convert_fetch_assoc($result))
 }
 convert_free_result($result);
 
-$result = convert_query("
-	SELECT cs_value
-	FROM {$from_prefix}core_cache_store
-		WHERE cs_key = 'stats'");
-list ($inv_stats) = convert_fetch_row($result);
-$inv_stats = unserialize($inv_stats);
-
-if (!empty($inv_stats['most_count']) && !empty($inv_stats['most_date']))
-{
-	$update_settings['mostOnline'] = $inv_stats['most_count'];
-	$update_settings['mostDate'] = $inv_stats['most_date'];
-}
 
 // While we coulddo this in one big batch, lets do it one by one.
 foreach ($update_settings as $key => $value)
