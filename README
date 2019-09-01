@@ -6,6 +6,8 @@ The software is licensed under [BSD 3-clause license](https://opensource.org/lic
 Contributions to documentation are licensed under [CC-by-SA 3](https://creativecommons.org/licenses/by-sa/3.0). Third party libraries or sets of images, are under their own licenses.
 
 ## Notes:
+Usage: download convert.php to root directory of your SMF forum. Next, locate the folder here on github for your forum software you are converting from.
+Next, grab the *.sql file for that forum software and place it in your SMF forum directory.
 
 Feel free to fork this repository and make your desired changes.
 
