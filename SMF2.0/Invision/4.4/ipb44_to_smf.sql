@@ -25,7 +25,7 @@ SELECT
 	m.member_id AS id_member, SUBSTRING(m.name, 1, 80) AS member_name,
 	SUBSTRING(m.name, 1, 255) AS real_name, m.email AS email_address,
 	SUBSTRING(m.members_pass_hash, 1, 64) AS passwd, SUBSTRING(m.members_pass_salt, 1, 8) AS password_salt, 
-        m.member_title AS usertitle, m.last_visit AS last_login, 
+        m.member_title AS usertitle, m.last_visit AS last_login, "" as buddy_list, "" as message_labels, "" as openid_uri, "" as ignore_boards,
         m.joined AS date_registered, SUBSTRING(pc.field_3, 1, 255) AS website_url,
 	SUBSTRING(pc.field_3, 1, 255) AS website_title,
 	SUBSTRING(m.signature, 1, 65534) AS signature, m.ip_address AS member_ip, m.ip_address AS member_ip2, '0' AS total_time_logged_in,
@@ -307,7 +307,7 @@ SELECT
 	p.pid AS id_msg, p.topic_id AS id_topic, p.post_date AS poster_time,
 	CASE WHEN p.author_name = '' THEN 0 ELSE p.author_id END AS id_member, SUBSTRING(t.title, 1, 255) AS subject,
 	SUBSTRING(p.author_name, 1, 255) AS poster_name,
-	SUBSTRING(p.ip_address, 1, 255) AS poster_ip, p.use_emo AS smileys_enabled,
+	SUBSTRING(p.ip_address, 1, 255) AS poster_ip, 1  AS smileys_enabled,
 	IFNULL(p.edit_time, 0) AS modified_time, SUBSTRING(p.edit_name, 1, 255) AS modified_name,
 	t.forum_id AS id_board, REPLACE(p.post, '<br />', '') AS body,
 	SUBSTRING(IFNULL(m.email, 'guest@example.com'), 1, 255) AS poster_email, 'xx' AS icon
