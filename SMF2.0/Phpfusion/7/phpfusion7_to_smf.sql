@@ -216,7 +216,7 @@ if (!file_exists($yAttachmentDir))
 	return;
 
 $file_hash = getAttachmentFilename($row['filename'], $row['id_attach'], null, true);
-$physical_filename = $id_attach . '_' . $file_hash;
+$physical_filename = $row['id_attach'] . '_' . $file_hash;
 
 if (strlen($physical_filename) > 255)
 	return;
@@ -225,7 +225,7 @@ if (copy($yAttachmentDir . '/' . $row['filename'], $attachmentUploadDir . '/' . 
 {
 	$no_add = false;
 	$rows[] = array(
-		'id_attach' => $id_attach,
+		'id_attach' => $row['id_attach'],
 		'size' => $row['size'],
 		'filename' => $row['filename'],
 		'file_hash' => $file_hash,
