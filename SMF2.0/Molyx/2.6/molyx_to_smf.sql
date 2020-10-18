@@ -15,7 +15,7 @@
 
 TRUNCATE {$to_prefix}members;
 ALTER TABLE {$to_prefix}members
-CHANGE COLUMN password_salt password_salt varchar(5) NOT NULL default '';
+CHANGE COLUMN password_salt password_salt varchar(255) NOT NULL default '';
 
 ---* {$to_prefix}members
 SELECT
