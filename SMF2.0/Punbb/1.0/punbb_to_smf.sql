@@ -13,7 +13,7 @@
 /******************************************************************************/
 
 ---{
-convert_query("ALTER TABLE {$to_prefix}members CHANGE password_salt password_salt varchar(12) NOT NULL DEFAULT  ''");
+convert_query("ALTER TABLE {$to_prefix}members CHANGE password_salt password_salt varchar(255) NOT NULL DEFAULT  ''");
 
 ---}
 /******************************************************************************/
