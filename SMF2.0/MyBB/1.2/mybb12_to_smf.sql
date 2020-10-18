@@ -24,7 +24,7 @@ alterDatabase('members', 'change column', array(
 	'old_name' => 'password_salt',
 	'name' => 'password_salt',
 	'type' => 'varchar',
-	'size' => 8,
+	'size' => 255,
 	'default' => '',
 ));
 ---}
