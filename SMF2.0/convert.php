@@ -393,7 +393,7 @@ function loadSettings()
 			$GLOBALS['ado_connection'] = new COM('ADODB.Connection');
 			$GLOBALS['ado_connection']->Open($connect_string);
 
-			register_shutdown_function(create_function('', '$GLOBALS[\'ado_connection\']->Close();'));
+			register_shutdown_function(function () {$GLOBALS['ado_connection']->Close();});
 		}
 	}
 	elseif (!$command_line && isset($convert_data['database_type']))
@@ -832,7 +832,7 @@ function doStep0($error_message = null)
 
 	if (empty($convert_data['flatfile']))
 		echo '
-					<div style="margin-bottom: 2ex;">If the two softwares are installed in separate directories, the Database account SMF was installed using will need access to the other database.  Either way, both must be installed on the same Database server.</div>';
+					<div style="margin-bottom: 2ex;">If the two software\'s are installed in separate directories, the Database account SMF was installed using will need access to the other database.  Either way, both must be installed on the same Database server.</div>';
 
 	echo '
 
@@ -1749,7 +1749,7 @@ function doStep2()
 				$memberUpdatedID = getMsgMemberID($topicArray['myid_last_msg']);
 
 				convert_query("
-					UPDATE {$to_prefix}topics
+					UPDATE IGNORE {$to_prefix}topics
 					SET id_first_msg = '$topicArray[myid_first_msg]',
 						id_member_started = '$memberStartedID', id_last_msg = '$topicArray[myid_last_msg]',
 						id_member_updated = '$memberUpdatedID', num_replies = '$topicArray[my_num_replies]'
@@ -2810,10 +2810,10 @@ function alterDatabase($table, $type, $parms, $no_prefix = false)
 			$i = 0;
 			for ($i = 0; $i < $count; $i++)
 			{
-				if ($parms{$i} == '_')
+				if ($parms[$i] == '_')
 					break;
 			}
-			$new_string = strtoupper($parms{($i + 1)});
+			$new_string = strtoupper($parms[($i + 1)]);
 			$parms = substr($new_string, 0, $i) . substr($new_string, $i + 1);
 
 			$smcFunc['db_remove_index']($table, $parms, $extra_parms);
@@ -3219,4 +3219,18 @@ if (!function_exists('updateSettingsFile'))
 	}
 }
 
+// https://stackoverflow.com/questions/2853454/php-unserialize-fails-with-non-encoded-characters/5813058#5813058
+function mb_unserialize($string)
+{
+    $string2 = preg_replace_callback(
+        '!s:(\d+):"(.*?)";!s',
+        function($m){
+            $len = strlen($m[2]);
+            $result = "s:$len:\"{$m[2]}\";";
+            return $result;
+
+        },
+        $string);
+    return unserialize($string2);
+}
 ?>
