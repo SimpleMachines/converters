@@ -15,6 +15,11 @@
 
 TRUNCATE {$to_prefix}members;
 TRUNCATE {$to_prefix}attachments;
+
+ALTER TABLE {$to_prefix}members
+	CHANGE COLUMN passwd passwd varchar(64) NOT NULL default '',
+	CHANGE COLUMN password_salt password_salt varchar(64) NOT NULL default '';
+
 ---* {$to_prefix}members
 ---{
 if (empty($INFO['admin_group']))
@@ -92,6 +97,12 @@ $row['signature'] = preg_replace(
 		'[url=$1]$2[/url]',
 	), ltrim(stripslashes($row['signature'])));
 $row['signature'] = substr(strtr(strtr($row['signature'], '<>', '[]'), array('[br /]' => '<br />')), 0, 65534);
+/* fix invalid birthdates */
+if(!preg_match('/\d{4}-\d{2}-\d{2}/', $row['birthdate']))
+	$row['birthdate'] = '0001-01-01';
+$row['instant_messages'] = (int) $row['instant_messages'];
+if (!isset($row['hide_email']))
+	$row['hide_email'] = 1;
 ---}
 SELECT
 	m.id AS id_member, SUBSTRING(m.name, 1, 80) AS member_name,
@@ -100,9 +111,9 @@ SELECT
 	posts, m.last_visit AS last_login, SUBSTRING(m.members_display_name, 1, 80) AS real_name,
 	SUBSTRING(me.yahoo, 1, 32) AS yim, m.msg_total AS instant_messages,
 	SUBSTRING(mc.converge_pass_hash, 1, 64) AS passwd,
-	SUBSTRING(mc.converge_pass_salt, 1, 5) AS password_salt,
+	SUBSTRING(mc.converge_pass_salt, 1, 64) AS password_salt,
 	SUBSTRING(m.email, 1, 255) AS email_address,
-	IF (m.bday_year = 0 AND m.bday_month != 0 AND m.bday_day != 0, CONCAT('0004-', m.bday_month, '-', m.bday_day), CONCAT_WS('-', IF(m.bday_year <= 4, 1, m.bday_year), IF(m.bday_month = 0, 1, m.bday_month), IF(m.bday_day = 0, 1, m.bday_day))) AS birthdate,
+	CONCAT(m.bday_year, '-', IF(m.bday_month < 10, CONCAT('0', m.bday_month), m.bday_month), '-', IF(m.bday_day < 10, CONCAT('0', m.bday_day), m.bday_day)) AS birthdate,
 	SUBSTRING(me.website, 1, 255) AS website_title,
 	SUBSTRING(me.website, 1, 255) AS website_url, me.signature,
 	SUBSTRING(me.location, 1, 255) AS location,
@@ -114,7 +125,8 @@ SELECT
 	'' AS lngfile, '' AS buddy_list, '' AS pm_ignore_list, '' AS message_labels,
 	'' AS personal_text, '' AS time_format, '' AS usertitle, '' AS member_ip,
 	'' AS secret_question, '' AS secret_answer, '' AS validation_code,
-	'' AS additional_groups, '' AS smiley_set, '' AS member_ip2
+	'' AS additional_groups, '' AS smiley_set, '' AS member_ip2,
+	'' AS openid_uri, '' as ignore_boards
 FROM {$from_prefix}members AS m
 	LEFT JOIN {$from_prefix}member_extra AS me ON (m.id = me.id)
 	LEFT JOIN {$from_prefix}members_converge AS mc ON (m.id = mc.converge_id)
@@ -198,6 +210,9 @@ TRUNCATE {$to_prefix}log_boards;
 TRUNCATE {$to_prefix}log_mark_read;
 
 ---* {$to_prefix}topics 250
+---{
+$row['id_poll'] = (int) $row['id_poll'];
+---}
 SELECT
 	t.tid AS id_topic, t.pinned AS is_sticky, t.forum_id AS id_board,
 	t.starter_id AS id_member_started, t.last_poster_id AS id_member_updated,
@@ -290,8 +305,9 @@ $row['body'] = addslashes(preg_replace(
 		'[email=$1]$2[/email]',
 		'[url=$1]$2[/url]',
 		'[url=$1]$2[/url]',
-	), ltrim(stripslashes($row['signature']))));
+	), ltrim(stripslashes($row['body']))));
 $row['body'] = substr(strtr(strtr($row['body'], '<>', '[]'), array('[br /]' => '<br />')), 0, 65534);
+$row['modified_time'] = (int) $row['modified_time'];
 ---}
 SELECT
 	p.pid AS id_msg, p.topic_id AS id_topic, p.post_date AS poster_time,
@@ -347,7 +363,7 @@ if (is_array($choices))
 					SET question = '$pollquestion'
 					WHERE id_poll = '$row[id_poll]'");
 
-		// Now that we've handled the question, go ahead with our choices and votes
+		// Now that we have handled the question, go ahead with our choices and votes
 		foreach($choice['choice'] AS $choiceid => $label)
 		{
 			//Add quotes around the label - for inserting choices that use reserved signs
@@ -365,7 +381,7 @@ if (is_array($choices))
 
 			// Finally - a row of information!
 			$rows[] = array(
-				'id_poll' => $row[id_poll],
+				'id_poll' => $row['id_poll'],
 				'id_choice' => $choiceid,
 				'label' => $label,
 				'votes' => $votes,
@@ -470,7 +486,7 @@ $row['body'] = addslashes(preg_replace(
 		'[email=$1]$2[/email]',
 		'[url=$1]$2[/url]',
 		'[url=$1]$2[/url]',
-	), ltrim(stripslashes($row['signature']))));
+	), ltrim(stripslashes($row['body']))));
 $row['body'] = strtr(strtr($row['body'], '<>', '[]'), array('[br /]' => '<br />'));
 ---}
 SELECT
@@ -548,7 +564,7 @@ WHERE member_id != -1;
 --- Converting calendar events...
 /******************************************************************************/
 
-TRUNCATE {$to_prefix}calendar
+TRUNCATE {$to_prefix}calendar;
 
 ---* {$to_prefix}calendar
 ---{
@@ -559,7 +575,7 @@ SELECT
 	event_id AS id_event,
 	event_unixstamp AS start_date, event_unixstamp AS end_date,
 	'0' AS id_board, '0' AS id_topic, SUBSTRING(event_title, 1, 60) AS title, event_member_id AS id_member
-FROM {$from_prefix}cal_events;
+FROM {$from_prefix}cal_events
 WHERE event_recurring = 1;
 ---*
 
@@ -626,8 +642,8 @@ while (true)
 		// If this is NOT an existing membergroup add it (1-5 = existing.)
 		if ($row['id_group'] > 5)
 		{
-			convert_insert('membergroups', array('id_group', 'group_name', 'max_messages', 'online_color', 'stars'),
-				array($row['id_group'] + 3, substr($row['group_name'], 0, 255), $row['max_messages'], '', ''
+			convert_insert('membergroups', array('id_group', 'group_name', 'description', 'max_messages', 'online_color', 'stars'),
+				array($row['id_group'] + 3, substr($row['group_name'], 0, 255), '', $row['max_messages'], '', ''
 			));
 			$groupID = $row['id_group'] + 3;
 		}
@@ -754,7 +770,7 @@ if (!function_exists('smfGroup'))
 	{
 		foreach ($group as $key => $value)
 		{
-			// Admin doesn't need to have his permissions done.
+			// Admin does not need to have his permissions done.
 			if ($value == 4)
 				unset($group[$key]);
 			elseif ($value == 2)
@@ -948,6 +964,9 @@ if (!empty($rows))
 ---# Moving settings...
 ---{
 // We will do all updates once we find them all.
+global $boarddir;
+$boarddir = $_POST['path_to'];
+
 $update_settings = array();
 
 $result = convert_query("
@@ -968,23 +987,23 @@ while ($row = convert_fetch_assoc($result))
 		break;
 
 	case 'hot_topic':
-		$update_settings['hotTopicPosts'] = $row['config_value'];
+		$update_settings[] = array('hotTopicPosts', $row['config_value']);
 		break;
 
 	case 'display_max_posts':
-		$update_settings['defaultMaxMessages'] = $row['config_value'];
+		$update_settings[] = array('defaultMaxMessages', $row['config_value']);
 		break;
 
 	case 'display_max_topics':
-		$update_settings['defaultMaxTopics'] = $row['config_value'];
+		$update_settings[] = array('defaultMaxTopics', $row['config_value']);
 		break;
 
 	case 'flood_control':
-		$update_settings['spamWaitTime'] = $row['config_value'];
+		$update_settings[] = array('spamWaitTime', $row['config_value']);
 		break;
 
 	case 'allow_online_list':
-		$update_settings['onlineEnable'] = $row['config_value'];
+		$update_settings[] = array('onlineEnable', $row['config_value']);
 		break;
 
 	case 'force_login':
@@ -1010,8 +1029,8 @@ $inv_stats = unserialize($inv_stats);
 
 if (!empty($inv_stats['most_count']) && !empty($inv_stats['most_date']))
 {
-	$update_settings['mostOnline'] = $inv_stats['most_count'];
-	$update_settings['mostDate'] = $inv_stats['most_date'];
+	$update_settings[] = array('mostOnline', $inv_stats['most_count']);
+	$update_settings[] = array('mostDate', $inv_stats['most_date']);
 }
 
 convert_insert('settings', array('variable', 'value'), $update_settings, 'replace');
@@ -1067,7 +1086,7 @@ if (copy($oldAttachmentDir . '/' . $oldFilename, $attachmentUploadDir . '/' . $p
 	if (!empty($attachmentExtension))
 	{
 		list ($width, $height) = getimagesize($attachmentUploadDir . '/' . $physical_filename);
-		// This shouldn't happen but apparently it might
+		// This shouldnt happen but apparently it might
 		if(empty($width))
 			$width = 0;
 		if(empty($height))
@@ -1076,7 +1095,7 @@ if (copy($oldAttachmentDir . '/' . $oldFilename, $attachmentUploadDir . '/' . $p
 
 	$rows[] = array(
 		'id_attach' => $id_attach,
-		'size' => filesize(attachmentUploadDir . '/' . $physical_filename),
+		'size' => filesize($attachmentUploadDir . '/' . $physical_filename),
 		'filename' => $row['filename'],
 		'file_hash' => $file_hash,
 		'id_msg' => $row['id_msg'],
@@ -1102,20 +1121,18 @@ FROM {$from_prefix}attachments;
 ---{
 $no_add = true;
 $keys = array('id_attach', 'size', 'filename', 'id_member', 'width', 'height', 'attachment_type');
+$oldAvatarDir = $_POST['path_from'] . '/uploads';
 
-if (!isset($oldAttachmentDir))
-{
-	$result = convert_query("
-		SELECT conf_value
-		FROM {$from_prefix}conf_settings
-		WHERE conf_key = 'upload_dir'
-		LIMIT 1");
-	list ($oldAvatarDir) = convert_fetch_row($result);
-	convert_free_result($result);
+$result = convert_query("
+	SELECT conf_value
+	FROM {$from_prefix}conf_settings
+	WHERE conf_key = 'upload_dir'
+	LIMIT 1");
+list ($tempOldAvatarDir) = convert_fetch_row($result);
+convert_free_result($result);
 
-	if (empty($oldAttachmentDir) || !file_exists($oldAvatarDir))
-		$oldAvatarDir = $_POST['path_from'] . '/uploads';
-}
+if (file_exists($tempOldAvatarDir))
+	$oldAvatarDir = $tempOldAvatarDir;
 
 if (!isset($id_attach))
 {
