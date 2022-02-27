@@ -512,7 +512,7 @@ while ($row = convert_fetch_assoc($request))
 		$this_board[$g][] = 'poll_add_own';
 	}
 
-	$setString = '';
+	$setString = array();
 	foreach ($this_board as $id_group => $permissions)
 	{
 		foreach ($permissions as $perm)
