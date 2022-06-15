@@ -291,12 +291,12 @@ class Converter
 			// The array is easier than using \r as well makes it easier for command line.
 			$error_array = [
 				'',
-				"The database encountered an error on line (from query), " . $line . ".", // . ", from file, " . $file . ".";
-				"The error received was:",
+				$this->doTxt('convert_database_encountered_error', $line),
+				$this->doTxt('convert_database_error_received'),
 				"---",
 				$error_level,
 				"---",
-				"The query ran was:",
+				$this->doTxt('convert_databse_query_ran_was'),
 				"---",
 				$error_string,
 				"---",
@@ -308,7 +308,7 @@ class Converter
 			$error_array = [
 				'',
 				$error_level % 255 == E_ERROR ? 'Error' : ($error_level % 255 == E_WARNING ? 'Warning' : 'Notice') . ': ' . $error_string . ' in ' . $file . ' on line ' . $line,
-				"Backtrace report",
+				$this->doTxt('convert_backtrace_report'),
 				"---"
 			];
 
@@ -359,7 +359,7 @@ class Converter
 		if ($this->isCli)
 		{
 			$this->sendMsgToCli($msg);
-			$this->sendMsgToCli('Skipping...');
+			$this->sendMsgToCli($this->doTxt('convert_skipping'));
 		}
 
 		$this->CustomWarning = $msg;
@@ -443,6 +443,24 @@ class Converter
 		$this->runTemplates();
 	}
 
+	/**
+	 * Get a language string and optionally provide a sprintf.
+	 * 
+	 * @param string $key The text string key
+	 * @param callback $func If we have a special function we need to execute prior to doing our timeout.
+	 * @param array $funcArgs  We will pass these to the special timeout function
+	 */
+	public function doTxt(string $key, string ...$args): string
+	{
+		global $txt;
+
+		// If we have args passed, we want to pass this to sprintf.  We will keep args in a array and unpack it into sprintf.
+		if (!empty($args))
+			return isset($txt[$key]) ? sprintf($txt[$key], ...$args) : $key;
+	
+		return $txt[$key] ?? $key;
+	}
+
 	/*
 	 * Make sure our enviornment is sane.  Such as PHP versions, supported databases, etc.
 	 * This executes first and typically should not do any errors
@@ -451,23 +469,23 @@ class Converter
 	{
 		global $smcFunc;
 
-		$this->sectionTitle = 'Checking the environment';
+		$this->sectionTitle = $this->doTxt('convert_title_SantityChecks');
 		$this->template = 'SantityChecks';
 
 		if (!is_null($this->getRequestVar('restart', false, false)))
 			$_SESSION = $_POST = $_GET = [];
 		if ($this->IsUnSupportedDatabase())
-			$this->doError('The converter detected that you are using ' . $this->smcFunc['db_title'] . '. The SMF Converter does not currently support this database type.');
+			$this->doError($this->doTxt('convert_unsupported_databases', $this->smcFunc['db_title']));
 
 		if (version_compare(PHP_VERSION, $GLOBALS['required_php_version'], '<'))
-			$this->doError(sprintf('This converter tool requires %1$s or higher', 'PHP ' . PHP_VERSION));
+			$this->doError($this->doTxt('convert_unsupported_version', 'PHP ' . PHP_VERSION));
 
 		db_extend();
 		if ($this->smcFunc['db_title'] == MYSQL_TITLE && version_compare($this->smcFunc['db_get_version'](), $GLOBALS['required_mysql_version'], '<'))
-			$this->doError(sprintf('This converter tool requires %1$s or higher', 'MySQL ' . $this->smcFunc['db_get_version']()));
+			$this->doError($this->doTxt('convert_unsupported_version', 'MySQL ' . $this->smcFunc['db_get_version']()));
 
 		if ($this->smcFunc['db_title'] == POSTGRE_TITLE && version_compare($this->smcFunc['db_get_version'](), $GLOBALS['required_postgresql_version'], '<'))
-			$this->doError(sprintf('This converter tool requires %1$s or higher', 'Postgresql ' . $this->smcFunc['db_get_version']()));
+			$this->doError($this->doTxt('convert_unsupported_version', 'Postgresql ' . $this->smcFunc['db_get_version']()));
 
 		// We have completed all checks.  Continue.
 		$this->goToNextStep();
@@ -481,7 +499,7 @@ class Converter
 	public function stepSelectScript() {
 		global $context;
 
-		$this->sectionTitle = 'Which software are you using?';
+		$this->sectionTitle = $this->doTxt('convert_title_SelectScript');
 		$this->template = 'SelectScript';
 
 		$context['converter_scripts'] = $this->findConverterScripts();
@@ -510,7 +528,7 @@ class Converter
 	*/
 	public function stepConvertOptions()
 	{
-		$this->sectionTitle = 'Configure the converter';
+		$this->sectionTitle = $this->doTxt('convert_title_ConvertOptions');
 		$this->template = 'ConvertOptions';
 
 		$this->context['script'] = $this->script = $this->loadConverterScript();
@@ -535,19 +553,19 @@ class Converter
 		if (!empty($this->getRequestVar('convertPathFrom')))
 		{
 			if (ini_get('open_basedir') != '' && !$found)
-				$this->doError('The converter detected that your host has open_basedir enabled on this server.  Please ask your host to disable this setting or try moving the contents of your ' . $this->script['name'] . ' to the public html folder of your site.');
+				$this->doError($this->doTxt('convert_open_basedir', $this->script['name']));
 			elseif (!$found)
-				$this->doError('Unable to find the settings for ' . $this->script['name'] . '. Please double check the path and try again.');
+				$this->doError($this->doTxt('convert_from_settings_missing', $this->script['name']));
 		}
 
 		if (!empty($this->getRequestVar('convertDbPass')) && !$this->verifySMFpassword($this->getRequestVar('convertDbPass')))
-			$this->doError('The database password you entered was incorrect.  Please make sure you are using the right password (for the SMF user!) and try it again.  If in doubt, use the password from Settings.php in the SMF installation.');
+			$this->doError($this->doTxt('convert_bad_smf_db_passwd'));
 
 		$this->setToPrefix();
 
 		// At this point, we can try to load the settings.
 		if (!$this->loadConverterSettings($this->script))
-			$this->doError('Sorry, the database connection information used in the specified installation of SMF cannot access the installation of ' . $this->script['name'] . '.  This may either mean that the installation doesn\'t exist, or that the Database account used does not have permissions to access it.', true);
+				$this->doError($this->doTxt('convert_from_database_no_access', $this->script['name']), true);
 
 		// Try this.
 		$this->SetMysqlLargeJoins();
@@ -562,7 +580,7 @@ class Converter
 	 */
 	public function stepConvertDatabase()
 	{
-		$this->sectionTitle = 'Converting your forum';
+		$this->sectionTitle = $this->doTxt('convert_title_ConvertDatabase');
 		$this->template = 'ConvertDatabase';
 
 		// Skip leg day?
@@ -600,7 +618,7 @@ class Converter
 		}
 
 		if (!empty($this->getRequestVar('skip', false, false) ?? 0))
-			$this->sendMsg('...Skipped');
+			$this->sendMsg($this->doTxt('convert_skiped'));
 
 		// Loop all the steps.
 		for($i = $this->currentSubStep + 1; method_exists($convclass, 'convertStep' . $i . 'Custom') || method_exists($convclass, 'convertStep' . $i); ++$i)
@@ -636,7 +654,7 @@ class Converter
 	 */
 	public function stepCleanupDatabase()
 	{
-		$this->sectionTitle = 'Cleaning up your forum';
+		$this->sectionTitle = $this->doTxt('convert_title_ConvertDatabase');
 		$this->template = 'ConvertDatabase';
 
 		// Loop ints.
@@ -689,7 +707,7 @@ class Converter
 	 */
 	public function stepFinishConvert()
 	{
-		$this->sectionTitle = 'Conversion Complete';
+		$this->sectionTitle = $this->doTxt('convert_title_FinishConvert');
 		$this->template = 'FinishConvert';
 
 		$this->setToPrefix();
@@ -708,8 +726,8 @@ class Converter
 		// For you CLI users, you are done.
 		if ($this->isCli)
 		{
-			$this->sendMsg('Conversion Complete!');
-			$this->sendMsg('Please delete this file as soon as possible for security reasons.');
+			$this->sendMsg($this->doTxt('convert_completed'));
+			$this->sendMsg($this->doTxt('convert_delete_script'));
 			die;
 		}
 
@@ -988,7 +1006,7 @@ class Converter
 				break;
 			}
 		if (empty($found))
-			$this->doError('Unable to find the converter script.  Please double check the path and try again.');
+			$this->doError($this->doTxt('convert_unable_to_find_scripts'));
 
 		try {
 			@include_once($this->convert_path . '/' . $this->convertScript);
@@ -1002,15 +1020,15 @@ class Converter
 		$className = preg_replace('~^convert_([a-z0-9\-_\.]*)_to_smf\.php$~i', '\1_to_smf', $p['basename']);
 
 		if (!method_exists($className, 'info'))
-			$this->doError('Missing information method, invalid class.');
+			$this->doError($this->doTxt('convert_missing_info_class'));
 
 		$script = call_user_func($className . '::info');
 		if (empty($script))
-			$this->doError('Unable to find the converter script configuration.  Please double check the path and try again.');
+			$this->doError($this->doTxt('convert_invalid_info_class'));
 
 		// Make sure this script is for this version.
 		if (!$this->matchPackageVersion($script['version']))
-			$this->doError('This converter is not available for your version of SMF.');
+			$this->doError($this->doTxt('convert_invalid_smf_version'));
 
 		$script['class'] = $className;
 
@@ -1413,9 +1431,9 @@ class Converter
 	 */
 	public static function ssi_on_error_method_cli(): void
 	{
-		global $context;
+		global $context, $txt;
 
-		echo "\n" . 'A fatal error has occurred in SMF' . "\n";
+		echo "\n" . ($txt['covnert_fatal_error'] ?? 'A fatal error has occurred in SMF') . "\n";
 		echo "---------------------------------------------\n";
 		echo $context['error_message'];
 		echo "\n---------------------------------------------\n";
@@ -1435,7 +1453,7 @@ class Converter
 			return gmdate("H:i:s", $elapsed);
 
 		$d = explode('|', gmdate("z|H:i:s", $elapsed));
-		return sprintf($txt['convert_time_day'], $d[0], $d[1]);
+		return self::txt('convert_time_day', $d[0], $d[1]);
 	}
 
 	/**
@@ -1474,6 +1492,8 @@ class Converter
 		$txt['convert_note'] = 'Note!';
 		$txt['convert_continue'] = 'Continue';
 		$txt['convert_skip'] = 'Skip';
+		$txt['convert_skipping'] = 'Skipping...';
+		$txt['convert_skiped'] = '...Skipped';
 
 		$txt['convert_step_selectscript'] = 'Select Script';
 		$txt['convert_step_checkenv'] = 'Check Environment';
@@ -1483,6 +1503,61 @@ class Converter
 		$txt['convert_step_finish'] = 'Finish';
 
 		$txt['convert_time_day'] = '%1$s days %2$s';
+		$txt['convert_database_encountered_error'] = 'The database encountered an error on line %1$s.';
+		$txt['convert_database_error_received'] = 'The error received was:';
+		$txt['convert_databse_query_ran_was'] = 'The query ran was:';
+		$txt['convert_backtrace_report'] = 'Backtrace report';
+
+		$txt['convert_title_SantityChecks'] = 'Checking the environment';
+		$txt['convert_unsupported_databases'] = 'The converter detected that you are using %1$s. The SMF Converter does not currently support this database type.';
+		$txt['convert_unsupported_version'] = 'This converter tool requires %1$s or higher';
+		$txt['convert_environment_sane'] = 'No issues with the environment detected.';
+
+		$txt['convert_title_SelectScript'] = 'Which software are you using?';
+		$txt['convert_no_scripts_found'] = 'The converter did not find any conversion data files.  Please check to see if the one you want is available for download at <a href="%1$s">$2$s</a>.  If it isn\'t, we may be able to write one for you - just ask us!';
+		$txt['covnert_no_scripts_folder'] = 'After you download it, simply upload it into the same folder as <strong>this convert.php file</strong>.  If you\'re having any other problems with this converter, don\'t hesitate to look for help on our <a href="%1$s">community forum</a>.';
+		$txt['convert_try_again'] = 'Try again';
+		$txt['convert_multiple_found'] = 'The converter found multiple conversion data files.  Please choose the one you wish to use.';
+		$txt['convert_not_found'] = 'It\'s not here!';
+		$txt['convert_not_found_find_more'] = 'If the software you\'re looking for doesn\'t appear above, please check to see if it is available for download at <a href="%1$s">%2$s</a> or <a href="%3$s">Git repository</a>.  If it isn\'t, we may be able to write one for you - just ask us!';
+		$txt['convert_not_found_help'] = 'If you\'re having any other problems with this converter, don\'t hesitate to look for help on our <a href="%1$s">community forum</a>.';
+
+		$txt['convert_title_ConvertOptions'] = 'Configure the converter';
+		$txt['convert_open_basedir'] = 'The converter detected that your host has open_basedir enabled on this server.  Please ask your host to disable this setting or try moving the contents of your %1$s to the public html folder of your site.';
+		$txt['convert_from_settings_missing'] = 'Unable to find the settings for %1$s. Please double check the path and try again.';
+		$txt['convert_bad_smf_db_passwd'] = 'The database password you entered was incorrect.  Please make sure you are using the right password (for the SMF user!) and try it again.  If in doubt, use the password from Settings.php in the SMF installation.';
+		$txt['convert_from_database_no_access'] = 'Sorry, the database connection information used in the specified installation of SMF cannot access the installation of %1$s.  This may either mean that the installation doesn\'t exist, or that the Database account used does not have permissions to access it.';
+		$txt['convert_option_flatfile'] = 'If the two softwares are installed in separate directories, the Database account SMF was installed using will need access to the other database.  Either way, both must be installed on the same Database server.';
+		$txt['convert_option_crossdbreq'] = 'This script requires cross database joins.  Ensure your SMF database user has access to the %1$s database.';
+		$txt['convert_option_info'] = 'The converter should only need to know where the two installations are, after which it should be able to handle everything for itself.';
+		$txt['convert_option_pathto'] = 'Path to %1$s:';
+		$txt['convert_option_fromFound'] = 'This may be the right path.';
+		$txt['convert_option_fromNotFound'] = 'You will need to change the value in this box.';
+		$txt['convert_option_convertDbPass'] = 'SMF database password:';
+		$txt['convert_option_empty_error_log'] = 'Empty the convert error log?';
+		$txt['convert_parital_conversion'] = 'Paritial Conversion:';
+		$txt['convert_parital_conversion_info'] = 'If choosen, this will convert only the choosen sections.';
+		$txt['convert_conversion_steps'] = 'Conversion steps:';
+
+		$txt['convert_title_ConvertDatabase'] = 'Converting your forum';
+
+		$txt['convert_title_ConvertDatabase'] = 'Cleaning up your forum';
+
+		$txt['convert_title_FinishConvert'] = 'Conversion Complete';
+		$txt['convert_completed'] = 'Conversion Complete!';
+		$txt['convert_delete_script'] = 'Please delete this file as soon as possible for security reasons.';
+		$txt['convert_finished_info'] = 'Congratulations, the conversion has completed successfully.  If you have or had any problems with this converter, or need help using SMF, please feel free to <a href="%1$s">look to us for support</a>.';
+		$txt['convert_delete_script_box'] = 'Please check this box to delete the converter right now for security reasons.';
+		$txt['convert_doesnt_work_on_all_servers'] = 'doesn\'t work on all servers.';
+		$txt['convert_everything_done'] = 'Now that everything is converted over, <a href="%1$s">your SMF installation</a> should have all the posts, boards, and members from the %2$s installation.';
+		$txt['convert_smooth_transition'] = 'We hope you had a smooth transition!';
+
+		$txt['convert_unable_to_find_scripts'] = 'Unable to find the converter script.  Please double check the path and try again.';
+		$txt['convert_missing_info_class'] = 'Missing information method, invalid class.';
+		$txt['convert_invalid_info_class'] = 'Unable to find the converter script configuration.  Please double check the path and try again.';
+		$txt['convert_invalid_smf_version'] = 'This converter is not available for your version of SMF.';
+
+		$txt['covnert_fatal_error'] = 'A fatal error has occurred in SMF';
 	}
 }
 
@@ -3254,27 +3329,29 @@ function template_convert_below()
 
 function template_convert_SantityChecks()
 {
+	global $txt;
+
 	echo '
-		<p>No issues with the environment detected.</p>';
+		<p>', $txt['convert_environment_sane'], '</p>';
 }
 
 function template_convert_SelectScript()
 {
-	global $context;
+	global $context, $txt;
 
 	if (empty($context['converter_scripts']))
 	{
 		echo '
-			<h3>The converter did not find any conversion data files.  Please check to see if the one you want is available for download at <a href="https://www.simplemachines.org/">www.simplemachines.org</a>.  If it isn\'t, we may be able to write one for you - just ask us!</h3>
+			<h3>', Converter::txt('convert_no_scripts_found', 'https://www.simplemachines.org', 'www.simplemachines.org'), '</h3>
 
-			After you download it, simply upload it into the same folder as <strong>this convert.php file</strong>.  If you\'re having any other problems with this converter, don\'t hesitate to look for help on our <a href="https://www.simplemachines.org/community/index.php">forum</a>.<br />
+			<p>', Converter::txt('covnert_no_scripts_folder', 'https://www.simplemachines.org/community/'), '</p>
 			<br />
-			<a href="', Converter::getVar('converturl'), '?step=1">Try again</a>';
+			<a href="', Converter::getVar('converturl'), '?step=1">', $txt['convert_try_again'], '</a>';
 	}
 	else
 	{
 		echo '
-			<h3>The converter found multiple conversion data files.  Please choose the one you wish to use.</h3>
+			<h3>', $txt['convert_multiple_found'], '</h3>
 
 			<ul>';
 
@@ -3285,38 +3362,38 @@ function template_convert_SelectScript()
 		echo '
 			</ul>
 
-			<h2>It\'s not here!</h2>
-			<h3>If the software you\'re looking for doesn\'t appear above, please check to see if it is available for download at <a href="https://www.simplemachines.org/">www.simplemachines.org</a>.  If it isn\'t, we may be able to write one for you - just ask us!</h3>
+			<h2>', $txt['convert_not_found'], '</h2>
+			<h3>', Converter::txt('convert_not_found_find_more', 'https://www.simplemachines.org/community/', 'www.simplemachines.org', 'https://github.com/SimpleMachines/converters'), '</h3>
 
-			If you\'re having any other problems with this converter, don\'t hesitate to look for help on our <a href="https://www.simplemachines.org/community/index.php">forum</a>.';
+			<p>', Converter::txt('convert_not_found_help', 'https://www.simplemachines.org/community/'), '</p>';
 	}
 }
 
 function template_convert_ConvertOptions()
 {
-	global $context;
+	global $context, $txt;
 
 	if (empty($context['script']['flatfile']))
 		echo '
-		<div style="margin-bottom: 2ex;">If the two softwares are installed in separate directories, the Database account SMF was installed using will need access to the other database.  Either way, both must be installed on the same Database server.</div>';
+		<div style="margin-bottom: 2ex;">', $txt['convert_option_flatfile'], '</div>';
 
 	if (!empty($context['script']['crossdbreq']))
 		echo '
-		<div style="margin-bottom: 2ex;">This script requires cross database joins.  Ensure your SMF database user has access to the ', $script['name'], ' database.</div>';
+		<div style="margin-bottom: 2ex;">', Converter::txt('convert_option_crossdbreq', $script['name']), '</div>';
 
 	echo '
-		<h3>The converter should only need to know where the two installations are, after which it should be able to handle everything for itself.</h3>
+		<h3>', $txt['convert_option_info'], '</h3>
 		<dl class="settings">';
 
 	if (!empty($context['script']['settings']))
 	{
 		echo '
 			<dt>
-				<label for="convertPathFrom">Path to ', $context['script']['name'], ':</label>
+				<label for="convertPathFrom">Path to ', Converter::txt('convert_option_pathto', $context['script']['name']), '</label>
 			</dt>
 			<dd>
 				<input type="text" name="convertPathFrom" id="convertPathFrom" value="', Converter::getVar('convertPathFrom'), '" size="60" class="input_text" />
-				<div class="smalltext">', !empty($context['fromFound']) ? 'This may be the right path.' : 'You will need to change the value in this box.', '</div>
+				<div class="smalltext">', !empty($context['fromFound']) ? $txt['convert_option_fromFound'] : $txt['convert_option_fromNotFound'], '</div>
 			</dd>';
 	}
 
@@ -3378,14 +3455,14 @@ function template_convert_ConvertOptions()
 	// Prompt for the SMF Database password.
 	echo '
 			<dt>
-				<label for="convertDbPass">SMF database password:</label>
+				<label for="convertDbPass">', $txt['convert_option_convertDbPass'], '</label>
 			</dt>
 			<dd>
 				<input type="password" name="convertDbPass" id="convertDbPass" value="" size="60" class="input_password" autofill="new-password" />
 				<div class="smalltext">The Database password (for verification only).</div>
 			</dd>
 			<dt>
-				<label for="empty_error_log">Empty the convert error log?</label>
+				<label for="empty_error_log">', $txt['convert_option_empty_error_log'], '</label>
 			</dt>
 			<dd>
 				<input type="checkbox" name="empty_error_log" id="empty_error_log" value="1" class="input_check" />
@@ -3399,8 +3476,8 @@ function template_convert_ConvertOptions()
 	if (!empty($context['steps']) && Converter::getVar('allowParitalConverts') ?? false)
 	{
 			echo '
-		<h2>Paritial Conversion:</h2>
-		<h3>If choosen, this will convert only the choosen sections.</h3>
+		<h2>', $txt['convert_parital_conversion'], '</h2>
+		<h3>', $txt['convert_parital_conversion_info'], '</h3>
 		<dl class="settings">';
 
 		// !!! TODO: Make this work.
@@ -3419,7 +3496,7 @@ function template_convert_ConvertOptions()
 	elseif (!empty($context['steps']))
 	{
 			echo '
-		<h2>Conversion steps:</h2>
+		<h2>', $txt['convert_conversion_steps'], '</h2>
 		<ul>';
 
 		// !!! TODO: Make this work.
@@ -3449,15 +3526,15 @@ function template_convert_ConvertDatabase()
 
 function template_convert_FinishConvert()
 {
-	global $context, $boardurl;
+	global $context, $boardurl, $txt;
 
 	echo '
-		<h3>Congratulations, the conversion has completed successfully.  If you have or had any problems with this converter, or need help using SMF, please feel free to <a href="https://www.simplemachines.org/community/index.php">look to us for support</a>.</h3>';
+		<h3>', Converter::txt('convert_finished_info', 'https://www.simplemachines.org/community'), '</h3>';
 
 	if (!empty($context['can_delete_self']))
 		echo '
 		<div style="margin: 1ex; font-weight: bold;">
-			<label for="delete_self"><input type="checkbox" id="delete_self" onclick="doTheDelete();" class="input_check" /> Please check this box to delete the converter right now for security reasons.</label> (doesn\'t work on all servers.)
+			<label for="delete_self"><input type="checkbox" id="delete_self" onclick="doTheDelete();" class="input_check" />', $txt['convert_delete_script_box'], '</label> (', $txt['convert_doesnt_work_on_all_servers'], ')
 		</div>
 		<script type="text/javascript"><!-- // --><![CDATA[
 			function doTheDelete()
@@ -3473,6 +3550,6 @@ function template_convert_FinishConvert()
 		<br />';
 
 	echo '
-		<p>Now that everything is converted over, <a href="', $boardurl, '/index.php">your SMF installation</a> should have all the posts, boards, and members from the ', $context['script']['name'], ' installation.</p>
-		<p>We hope you had a smooth transition!</p>';
+		<p>', Converter::txt('convert_everything_done', $boardurl . '/index.php', $context['script']['name']), '</p>
+		<p>', $txt['convert_smooth_transition'], '</p>';
 }
