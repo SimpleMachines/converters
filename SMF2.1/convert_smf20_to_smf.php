@@ -24,19 +24,17 @@ if (basename($_SERVER['PHP_SELF']) === basename(__FILE__))
 		die('This tool requires convert.php to function, please place convert.php in the same directory as this script.');
 }
 
-class elkarte11x_to_smf extends ConverterBase
+class smf20x_to_smf extends ConverterBase
 {
-	public static string $basepath = '';
-
 	public static bool $purge = false;
 
 	public static function info(): array
 	{
 		return [
-			'name' => 'ElkArte 1.1.x',
+			'name' => 'SMF 2.0.x',
 			'version' => 'SMF 2.1.*',
 			'settings' => ['/Settings.php'],
-			'globals' => ['db_server', 'db_name', 'db_user', 'db_passwd', 'db_prefix', 'boarddir'],
+			'globals' => ['db_server', 'db_name', 'db_user', 'db_passwd', 'db_prefix'],
 			'from_prefix' => '{$db_prefix}',
 			'test_table' => '{from_prefix}members',
 			'parameters' => [
@@ -83,14 +81,6 @@ class elkarte11x_to_smf extends ConverterBase
 		self::$purge = Converter::getParameter('purge') ?? false;
 	}
 
-	public static function convertdec2IPv6(...$decs)
-	{
-		foreach ($decs as &$dec)
-			$dec = dechex($dec);
-
-		return implode(':', $decs);
-	}
-
 	public static string	$convertStep1info = 'Converting membergroups';
 	public static function	 convertStep1(): array
 	{
@@ -107,7 +97,7 @@ class elkarte11x_to_smf extends ConverterBase
 				'table' => '{to_prefix}membergroups',
 				'query' => '
 					SELECT
-						id_group, group_name, description, online_color, min_posts, max_messages, icons,
+						id_group, group_name, description, online_color, min_posts, max_messages, stars AS icons,
 						group_type, hidden, id_parent
 					FROM {from_prefix}membergroups',
 			],
@@ -130,35 +120,14 @@ class elkarte11x_to_smf extends ConverterBase
 				'table' => '{to_prefix}members',
 				'query' => '
 					SELECT
-						id_member, member_name, date_registered, posts, id_group, lngfile, last_login, real_name, personal_messages AS instant_messages, unread_messages, new_pm, buddy_list, pm_ignore_list, pm_prefs, mod_prefs, passwd, email_address, birthdate, website_title, website_url, show_online, time_format, signature, time_offset, avatar, usertitle, member_ip, member_ip2, secret_question, secret_answer, id_theme, is_activated, validation_code, id_msg_last_visit, additional_groups, smiley_set, id_post_group, total_time_logged_in, password_salt, ignore_boards, warning, passwd_flood, receive_from AS pm_receive_from
+						id_member, member_name, date_registered, posts, id_group, lngfile, last_login, real_name, instant_messages, unread_messages, new_pm, buddy_list, pm_ignore_list, pm_prefs, mod_prefs, passwd, email_address, personal_text, birthdate, website_title, website_url, show_online, time_format, signature, time_offset, avatar, usertitle, member_ip, member_ip2, secret_question, secret_answer, id_theme, is_activated, validation_code, id_msg_last_visit, additional_groups, smiley_set, id_post_group, total_time_logged_in, password_salt, ignore_boards, warning, passwd_flood, pm_receive_from
 					FROM {from_prefix}members',
 			],
 		];
 	}
 
-	public static string	$convertStep3info = 'Converting custom profile field';
+	public static string	$convertStep3info = 'Converting gender field';
 	public static function	 convertStep3(): array
-	{
-		return [
-			'purge' => [
-				'query' => 'TRUNCATE {to_prefix}custom_fields',
-			],
-			'progress' => [
-				'progress_query' => 'SELECT COUNT(*) FROM {to_prefix}custom_fields',
-				'total_query' => 'SELECT COUNT(*) FROM {from_prefix}custom_fields'
-			],
-			'process' => [
-				'table' => '{to_prefix}custom_fields',
-				'query' => '
-					SELECT
-						id_field, col_name, field_name, field_desc, field_type, field_length, field_options, vieworder AS field_order, mask, show_reg, show_display, show_memberlist AS show_mlist, show_profile, private, active, bbc, can_search, default_value, enclose, placement
-					FROM {from_prefix}custom_fields',
-			],
-		];
-	}
-
-	public static string	$convertStep4info = 'Converting custom profile field values';
-	public static function	 convertStep4(): array
 	{
 		return [
 			'purge' => [
@@ -166,23 +135,200 @@ class elkarte11x_to_smf extends ConverterBase
 			],
 			'progress' => [
 				'progress_query' => 'SELECT COUNT(*) FROM {to_prefix}themes WHERE id_member > 0 AND variable = {literal:cust_gender}',
-				'total_query' => 'SELECT COUNT(*) FROM {from_prefix}custom_fields_data'
+				'total_query' => 'SELECT COUNT(*) FROM {from_prefix}members WHERE gender != {empty} AND gender != 0'
 			],
 			'process' => [
-				'table' => '{to_prefix}custom_fields_data',
+				'table' => '{to_prefix}members',
 				'query' => '
 					SELECT
 						id_member,
 						0 AS id_theme,
-						variable,
-						value
-					FROM {from_prefix}custom_fields_data',
+						{literal:cust_gender} AS variable,
+						gender AS value
+					FROM {from_prefix}members
+					WHERE gender != {empty} AND gender != 0',
 			],
 		];
 	}
 
-	public static string	$convertStep5info = 'Converting categories';
+	public static string	$convertStep4info = 'Converting location field';
+	public static function	 convertStep4(): array
+	{
+		return [
+			'purge' => [
+				'query' => 'DELETE FROM {to_prefix}themes WHERE id_member > 0 AND variable = {literal:cust_loca}',
+			],
+			'progress' => [
+				'progress_query' => 'SELECT COUNT(*) FROM {to_prefix}themes WHERE id_member > 0 AND variable = {literal:cust_loca}',
+				'total_query' => 'SELECT COUNT(*) FROM {from_prefix}members WHERE location != {empty}'
+			],
+			'process' => [
+				'table' => '{to_prefix}members',
+				'query' => '
+					SELECT
+						id_member,
+						0 AS id_theme,
+						{literal:cust_loca} AS variable,
+						gender AS value
+					FROM {from_prefix}members
+					WHERE location != {empty}',
+			],
+		];
+	}
+
+	public static string	$convertStep5info = 'Converting icq field';
 	public static function	 convertStep5(): array
+	{
+		return [
+			'purge' => [
+				'query' => 'DELETE FROM {to_prefix}themes WHERE id_member > 0 AND variable = {literal:cust_loca}',
+			],
+			'progress' => [
+				'progress_query' => 'SELECT COUNT(*) FROM {to_prefix}themes WHERE id_member > 0 AND variable = {literal:cust_loca}',
+				'total_query' => 'SELECT COUNT(*) FROM {from_prefix}members WHERE icq != {empty}'
+			],
+			'process' => [
+				'table' => '{to_prefix}members',
+				'query' => '
+					SELECT
+						id_member,
+						0 AS id_theme,
+						{literal:cust_loca} AS variable,
+						gender AS value
+					FROM {from_prefix}members
+					WHERE icq != {empty}',
+			],
+		];
+	}
+
+	public static string	$convertStep6info = 'Converting pm_email_notify field (Part 1)';
+	public static function	 convertStep6(): array
+	{
+		return [
+			'purge' => [
+				'query' => 'DELETE FROM {to_prefix}user_alerts_prefs WHERE id_member > 0 AND alert_pref = {literal:pm_new}',
+			],
+			'progress' => [
+				'progress_query' => 'SELECT COUNT(*) FROM {to_prefix}user_alerts_prefs WHERE id_member > 0 AND alert_pref = {literal:pm_new}',
+				'total_query' => 'SELECT COUNT(*) FROM {from_prefix}members WHERE pm_email_notify > 0'
+			],
+			'process' => [
+				'table' => '{to_prefix}user_alerts_prefs',
+				'query' => '
+					SELECT
+						id_member,
+						{literal:pm_new} AS alert_pref,
+						CASE pm_email_notify
+							WHEN 1 THEN 2
+							ELSE 0
+						END AS alert_value
+					FROM {from_prefix}members
+					WHERE pm_email_notify > 0',
+			],
+		];
+	}
+
+	public static string	$convertStep7info = 'Converting pm_email_notify field (Part 2)';
+	public static function	 convertStep7(): array
+	{
+		return [
+			'purge' => [
+				'query' => 'DELETE FROM {to_prefix}user_alerts_prefs WHERE id_member > 0 AND alert_pref = {literal:pm_notify}',
+			],
+			'progress' => [
+				'progress_query' => 'SELECT COUNT(*) FROM {to_prefix}user_alerts_prefs WHERE id_member > 0 AND alert_pref = {literal:pm_notify}',
+				'total_query' => 'SELECT COUNT(*) FROM {from_prefix}members WHERE pm_email_notify > 0'
+			],
+			'process' => [
+				'table' => '{to_prefix}user_alerts_prefs',
+				'query' => '
+					SELECT
+						id_member,
+						{literal:pm_notify} AS alert_pref,
+						CASE pm_email_notify
+							WHEN 2 THEN 2
+							ELSE 1
+						END AS alert_value
+					FROM {from_prefix}members
+					WHERE pm_email_notify > 0',
+			],
+		];
+	}
+
+	public static string	$convertStep8info = 'Converting notify_regularity';
+	public static function	 convertStep8(): array
+	{
+		return [
+			'purge' => [
+				'query' => 'DELETE FROM {to_prefix}user_alerts_prefs WHERE id_member > 0 AND alert_pref = {literal:msg_notify_pref}',
+			],
+			'progress' => [
+				'progress_query' => 'SELECT COUNT(*) FROM {to_prefix}user_alerts_prefs WHERE id_member > 0 AND alert_pref = {literal:msg_notify_pref}',
+				'total_query' => 'SELECT COUNT(*) FROM {from_prefix}members WHERE notify_regularity > 0'
+			],
+			'process' => [
+				'table' => '{to_prefix}user_alerts_prefs',
+				'query' => '
+					SELECT
+						id_member,
+						{literal:msg_notify_pref} AS alert_pref,
+						1 alert_value
+					FROM {from_prefix}members
+					WHERE notify_regularity > 0',
+			],
+		];
+	}
+
+	public static string	$convertStep9info = 'Converting notify_send_body';
+	public static function	 convertStep9(): array
+	{
+		return [
+			'purge' => [
+				'query' => 'DELETE FROM {to_prefix}user_alerts_prefs WHERE id_member > 0 AND alert_pref = {literal:msg_receive_body}',
+			],
+			'progress' => [
+				'progress_query' => 'SELECT COUNT(*) FROM {to_prefix}user_alerts_prefs WHERE id_member > 0 AND alert_pref = {literal:msg_receive_body}',
+				'total_query' => 'SELECT COUNT(*) FROM {from_prefix}members WHERE notify_send_body > 0'
+			],
+			'process' => [
+				'table' => '{to_prefix}user_alerts_prefs',
+				'query' => '
+					SELECT
+						id_member,
+						{literal:msg_receive_body} AS alert_pref,
+						1 alert_value
+					FROM {from_prefix}members
+					WHERE notify_send_body > 0',
+			],
+		];
+	}
+
+	public static string	$convertStep10info = 'Converting notify_types';
+	public static function	 convertStep10(): array
+	{
+		return [
+			'purge' => [
+				'query' => 'DELETE FROM {to_prefix}user_alerts_prefs WHERE id_member > 0 AND alert_pref = {literal:msg_notify_type}',
+			],
+			'progress' => [
+				'progress_query' => 'SELECT COUNT(*) FROM {to_prefix}user_alerts_prefs WHERE id_member > 0 AND alert_pref = {literal:msg_notify_type}',
+				'total_query' => 'SELECT COUNT(*) FROM {from_prefix}members WHERE notify_types > 0'
+			],
+			'process' => [
+				'table' => '{to_prefix}user_alerts_prefs',
+				'query' => '
+					SELECT
+						id_member,
+						{literal:msg_notify_type} AS alert_pref,
+						1 alert_value
+					FROM {from_prefix}members
+					WHERE notify_types > 0',
+			],
+		];
+	}
+
+	public static string	$convertStep11info = 'Converting categories';
+	public static function	 convertStep11(): array
 	{
 		return [
 			'purge' => [
@@ -202,8 +348,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep6info = 'Converting boards';
-	public static function	 convertStep6(): array
+	public static string	$convertStep12info = 'Converting boards';
+	public static function	 convertStep12(): array
 	{
 		return [
 			'purge' => [
@@ -224,8 +370,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep7info = 'Converting topics';
-	public static function	 convertStep7(): array
+	public static string	$convertStep13info = 'Converting topics';
+	public static function	 convertStep13(): array
 	{
 		return [
 			'purge' => [
@@ -253,8 +399,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep8info = 'Converting messages';
-	public static function	 convertStep8(): array
+	public static string	$convertStep14info = 'Converting messages';
+	public static function	 convertStep14(): array
 	{
 		return [
 			'purge' => [
@@ -281,8 +427,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep9info = 'Converting polls';
-	public static function	 convertStep9(): array
+	public static string	$convertStep15info = 'Converting polls';
+	public static function	 convertStep15(): array
 	{
 		return [
 			'purge' => [
@@ -310,8 +456,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep10info = 'Converting poll choices';
-	public static function	 convertStep10(): array
+	public static string	$convertStep16info = 'Converting poll choices';
+	public static function	 convertStep16(): array
 	{
 		return [
 			'progress' => [
@@ -328,8 +474,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep11info = 'Converting poll votes';
-	public static function	 convertStep11(): array
+	public static string	$convertStep17info = 'Converting poll votes';
+	public static function	 convertStep17(): array
 	{
 		return [
 			'progress' => [
@@ -346,8 +492,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep12info = 'Converting personal messages (part 1 - pms)';
-	public static function	 convertStep12(): array
+	public static string	$convertStep18info = 'Converting personal messages (part 1 - pms)';
+	public static function	 convertStep18(): array
 	{
 		return [
 			'purge' => [
@@ -368,8 +514,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep13info = 'Converting personal messages (part 2 -recipients)';
-	public static function	 convertStep13(): array
+	public static string	$convertStep19info = 'Converting personal messages (part 2 -recipients)';
+	public static function	 convertStep19(): array
 	{
 		return [
 			'purge' => [
@@ -396,8 +542,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep14info = 'Converting personal messages (part 3 - labels)';
-	public static function	 convertStep14Custom(): void
+	public static string	$convertStep20info = 'Converting personal messages (part 3 - labels)';
+	public static function	 convertStep20Custom(): void
 	{
 		$currentStart = Converter::getVar('currentStart');
 
@@ -439,8 +585,8 @@ class elkarte11x_to_smf extends ConverterBase
 			);
 	}
 
-	public static string	$convertStep15info = 'Converting personal messages (part 4 - labled messages)';
-	public static function	 convertStep15Custom(): void
+	public static string	$convertStep21info = 'Converting personal messages (part 4 - labled messages)';
+	public static function	 convertStep21Custom(): void
 	{
 		$currentStart = Converter::getVar('currentStart');
 
@@ -460,16 +606,13 @@ class elkarte11x_to_smf extends ConverterBase
 					'limit' => self::getBlockSize('members')
 			]);
 
-			if (ConverterDb::num_rows($result) == 0)
+			if (ConverterDb::num_rows($result) )
 				break;
 
 			while ($row = ConverterDb::fetch_assoc($result))
 				$tempA[$row['id_member']][$row['id_pm']] = $row;
 			ConverterDb::free_result($result);
 			$members = array_keys($tempA);
-
-			if (empty($tempA) || empty($members))
-				break;
 
 			$result = ConverterDb::query('
 				SELECT id_label, id_member, name
@@ -520,8 +663,8 @@ class elkarte11x_to_smf extends ConverterBase
 			);
 	}
 
-	public static string	$convertStep16info = 'Converting attachments';
-	public static function	 convertStep16Custom(): void
+	public static string	$convertStep22info = 'Converting attachments';
+	public static function	 convertStep22Custom(): void
 	{
 		$attachmentUploadDir = static::getAttachmentDir();
 
@@ -551,7 +694,7 @@ class elkarte11x_to_smf extends ConverterBase
 
 		// We may have a non multiple attachment directory support.
 		if (!empty($oldcurrentAttachmentUploadDir))
-			$attachDirs = safe_unserialize($oldAttachmentDir);
+			$attachDirs = @safe_unserialize($oldAttachmentDir);
 
 		$currentStart = Converter::getVar('currentStart');
 		while (true)
@@ -570,7 +713,7 @@ class elkarte11x_to_smf extends ConverterBase
 			{
 				$old_physical_filename = self::checkAndFixPath(
 					(!empty($oldcurrentAttachmentUploadDir) ? $attachDirs[$row['id_folder']] : $oldAttachmentDir)
-					. '/' . $row['id_attach'] . '_' . $row['file_hash'] . '.elk'
+					. '/' . $row['id_attach'] . '_' . $row['file_hash']
 				);
 
 				// Trying to support moving files into multiple attachment directories is too complicated.  One dir it is.
@@ -623,8 +766,8 @@ class elkarte11x_to_smf extends ConverterBase
 			);
 	}
 
-	public static string	$convertStep17info = 'Converting approval queue';
-	public static function	 convertStep17(): array
+	public static string	$convertStep23info = 'Converting approval queue';
+	public static function	 convertStep23(): array
 	{
 		return [
 			'purge' => [
@@ -645,8 +788,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep18info = 'Converting ban groups';
-	public static function	 convertStep18(): array
+	public static string	$convertStep24info = 'Converting ban groups';
+	public static function	 convertStep24(): array
 	{
 		return [
 			'purge' => [
@@ -674,8 +817,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep19info = 'Converting ban items';
-	public static function	 convertStep19(): array
+	public static string	$convertStep25info = 'Converting ban items';
+	public static function	 convertStep25(): array
 	{
 		return [
 			'purge' => [
@@ -689,28 +832,15 @@ class elkarte11x_to_smf extends ConverterBase
 			'process' => [
 				'table' => '{to_prefix}ban_items',
 				'parse' => function (&$row) {
-					// Make sure IPv6 is converted.
-					if (!empty($row['ip_low5']) || !empty($row['ip_low6']) || !empty($row['ip_low7']) || !empty($row['ip_low8'])
-						|| !empty($row['ip_high5']) || !empty($row['ip_high6']) || !empty($row['ip_high7']) || !empty($row['ip_high8'])
-						|| $row['ip_low1'] > 255 || $row['ip_low2'] > 255 || $row['ip_low3'] > 255 || $row['ip_low4'] > 255
-						|| $row['ip_high1'] > 255 || $row['ip_high2'] > 255 || $row['ip_high3'] > 255 || $row['ip_high4'] > 255
-					)
-					{
-						$row['ip_low'] = self::convertdec2IPv6($row['ip_low1'], $row['ip_low2'], $row['ip_low3'], $row['ip_low4'], $row['ip_low5'], $row['ip_low6'], $row['ip_low7'], $row['ip_low8']);
-						$row['ip_high'] = self::convertdec2IPv6($row['ip_high1'], $row['ip_high2'], $row['ip_high3'], $row['ip_high4'], $row['ip_high5'], $row['ip_high6'], $row['ip_high7'], $row['ip_high8']);
-					}
-					// IPv4
-					else
-					{
-						$row['ip_low'] = $row['ip_low1'] . '.' . $row['ip_low2'] . '.' . $row['ip_low3'] . '.' . $row['ip_low4'];
-						$row['ip_high'] = $row['ip_high1'] . '.' . $row['ip_high2'] . '.' . $row['ip_high3'] . '.' . $row['ip_high4'];
-					}
-			
-					unset($row['ip_low1'], $row['ip_low2'], $row['ip_low3'], $row['ip_low4'], $row['ip_low5'], $row['ip_low6'], $row['ip_low7'], $row['ip_low8'], $row['ip_high1'], $row['ip_high2'], $row['ip_high3'], $row['ip_high4'], $row['ip_high5'], $row['ip_high6'], $row['ip_high7'], $row['ip_high8']);
+					// The insert will make this a inet.
+					$row['ip_low'] = $row['ip_low1'] . '.' . $row['ip_low2'] . '.' . $row['ip_low3'] . '.' . $row['ip_low4'];
+					$row['ip_high'] = $row['ip_high1'] . '.' . $row['ip_high2'] . '.' . $row['ip_high3'] . '.' . $row['ip_high4'];
+					
+					unset($row['ip_low1'], $row['ip_low2'], $row['ip_low3'], $row['ip_low4'], $row['ip_high1'], $row['ip_high2'], $row['ip_high3'], $row['ip_high4']);
 				},
 				'query' => '
 					SELECT
-						id_ban, id_ban_group, ip_low1, ip_high1, ip_low2, ip_high2, ip_low3, ip_high3, ip_low4, ip_high4, ip_low5, ip_high5, ip_low6, ip_high6, ip_low7, ip_high7, ip_low8, ip_high8, hostname, email_address, id_member, hits
+						id_ban, id_ban_group, ip_low1, ip_high1, ip_low2, ip_high2, ip_low3, ip_high3, ip_low4, ip_high4, hostname, email_address, id_member, hits
 					FROM {from_prefix}ban_items',
 			],
 			'post_process' => function() {
@@ -727,8 +857,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep20info = 'Converting board permissions';
-	public static function	 convertStep20(): array
+	public static string	$convertStep26info = 'Converting board permissions';
+	public static function	 convertStep26(): array
 	{
 		return [
 			'purge' => [
@@ -749,8 +879,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep21info = 'Converting calendar';
-	public static function	 convertStep21(): array
+	public static string	$convertStep27info = 'Converting calendar';
+	public static function	 convertStep27(): array
 	{
 		return [
 			'purge' => [
@@ -771,8 +901,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep22info = 'Converting calendar holidays';
-	public static function	 convertStep22(): array
+	public static string	$convertStep28info = 'Converting calendar holidays';
+	public static function	 convertStep28(): array
 	{
 		return [
 			'purge' => [
@@ -793,8 +923,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep23info = 'Converting collapsed categories';
-	public static function	 convertStep23(): array
+	public static string	$convertStep29info = 'Converting collapsed categories';
+	public static function	 convertStep29(): array
 	{
 		return [
 			'purge' => [
@@ -819,8 +949,47 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep24info = 'Converting group moderators';
-	public static function	 convertStep24(): array
+	public static string	$convertStep30info = 'Converting custom fields';
+	public static function	 convertStep30(): array
+	{
+		return [
+			'purge' => [
+				'query' => 'DELETE FROM {to_prefix}custom_fields WHERE col_name NOT IN ({array_string:custfields})',
+				'params' => ['custfields' => ['cust_icq', 'cust_skype', 'cust_loca', 'cust_gender']],
+			],
+			'progress' => [
+				'progress_query' => 'SELECT COUNT(*) FROM {to_prefix}custom_fields WHERE col_name NOT IN ({array_string:custfields})',
+				'progress_params' => ['custfields' => ['cust_icq', 'cust_skype', 'cust_loca', 'cust_gender']],
+				'total_query' => 'SELECT COUNT(*) FROM {from_prefix}custom_fields'
+			],
+			'pre_process' => function() {
+				if (empty($_SESSION['custom_field_start']))
+				{
+					$request = ConverterDb::query('
+						SELECT MAX(id_field) + 1 AS value
+						FROM {from_prefix}custom_fields');
+					list ($_SESSION['custom_field_start']) = ConverterDb::fetch_row($request);
+					ConverterDb::free_result($request);
+				}
+			},
+			'process' => [
+				'table' => '{to_prefix}custom_fields',
+				'parse' => function (&$row) {
+					// We don't want to insert over the defaults.
+					$row['id_field'] += $_SESSION['custom_field_start'] ?? 4;
+					// We don't know this, so make it up.
+					$row['field_order'] = $row['id_field'];
+				},
+				'query' => '
+					SELECT
+						id_field, col_name, field_name, field_desc, field_type, field_length, field_options, 0 AS field_order, mask, show_reg, show_display, show_profile, private, active, bbc, can_search, default_value, enclose, placement
+					FROM {from_prefix}custom_fields',
+			],
+		];
+	}
+
+	public static string	$convertStep31info = 'Converting group moderators';
+	public static function	 convertStep31(): array
 	{
 		return [
 			'purge' => [
@@ -840,8 +1009,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep25info = 'Converting message icons';
-	public static function	 convertStep25(): array
+	public static string	$convertStep32info = 'Converting message icons';
+	public static function	 convertStep32(): array
 	{
 		return [
 			'purge' => [
@@ -861,8 +1030,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep26info = 'Converting board moderators';
-	public static function	 convertStep26(): array
+	public static string	$convertStep33info = 'Converting board moderators';
+	public static function	 convertStep33(): array
 	{
 		return [
 			'purge' => [
@@ -882,8 +1051,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep27info = 'Converting permission profiles';
-	public static function	 convertStep27(): array
+	public static string	$convertStep34info = 'Converting permission profiles';
+	public static function	 convertStep34(): array
 	{
 		return [
 			'purge' => [
@@ -903,8 +1072,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep28info = 'Converting permissions';
-	public static function	 convertStep28(): array
+	public static string	$convertStep35info = 'Converting permissions';
+	public static function	 convertStep35(): array
 	{
 		return [
 			'purge' => [
@@ -924,8 +1093,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep29info = 'Converting known good settings';
-	public static function	 convertStep29(): array
+	public static string	$convertStep36info = 'Converting known good settings';
+	public static function	 convertStep36(): array
 	{
 		return [
 			'process' => [
@@ -937,16 +1106,23 @@ class elkarte11x_to_smf extends ConverterBase
 						variable, value
 					FROM {from_prefix}settings
 					WHERE
-						variable IN ({array_string:knownGood})',
+						variable NOT LIKE {string:dir}
+						AND variable NOT LIKE {string:url}
+						AND variable NOT LIKE {string:directory}
+						AND variable NOT LIKE {string:integrate}
+						AND variable NOT IN ({literal:smiley_sets_known}, {literal:smiley_sets_names}, {literal:smfVersion})',
 				'params' => [
-					'knownGood' => ['allow_disableAnnounce', 'allow_editDisplayName', 'allow_guestAccess', 'allow_hideOnline', 'attachmentCheckExtensions', 'attachmentDirFileLimit', 'attachmentDirSizeLimit', 'attachmentEnable', 'attachmentExtensions', 'attachmentNumPerPostLimit', 'attachmentPostLimit', 'attachmentShowImages', 'attachmentSizeLimit', 'attachmentThumbHeight', 'attachmentThumbnails', 'attachmentThumbWidth', 'attachment_image_paranoid', 'attachment_image_reencode', 'attachment_thumb_png', 'autoFixDatabase', 'autoLinkUrls', 'avatar_action_too_large', 'avatar_download_png', 'avatar_paranoid', 'avatar_reencode', 'banLastUpdated', 'birthday_email', 'cache_enable', 'cal_daysaslink', 'cal_days_for_index', 'cal_defaultboard', 'cal_enabled', 'cal_maxspan', 'cal_maxyear', 'cal_minyear', 'cal_showbdays', 'cal_showevents', 'cal_showholidays', 'cal_showweeknum', 'censorIgnoreCase', 'censor_proper', 'censor_vulgar', 'compactTopicPagesContiguous', 'compactTopicPagesEnable', 'cookieTime', 'defaultMaxMembers', 'defaultMaxMessages', 'defaultMaxTopics', 'default_personal_text', 'default_timezone', 'edit_disable_time', 'edit_wait_time', 'enableAllMessages', 'enableBBC', 'enableCompressedOutput', 'enableErrorLogging', 'enableParticipation', 'enablePostHTML', 'enablePreviousNext', 'enable_buddylist', 'failed_login_threshold', 'global_character_set', 'httponlyCookies', 'jquery_source', 'knownThemes', 'lastActive', 'last_mod_report_action', 'latestMember', 'latestRealName', 'mail_next_send', 'mail_recent', 'mail_type', 'maxMsgID', 'max_image_height', 'max_image_width', 'max_messageLength', 'memberlist_updated', 'mostDate', 'mostOnline', 'mostOnlineToday', 'mostOnlineUpdated', 'news', 'next_task_time', 'number_format', 'oldTopicDays', 'onlineEnable', 'package_make_backups', 'permission_enable_deny', 'permission_enable_postgroups', 'pm_spam_settings', 'pollMode', 'pruningOptions', 'rand_seed', 'recycle_board', 'recycle_enable', 'registration_method', 'reg_verification', 'requireAgreement', 'reserveCase', 'reserveName', 'reserveNames', 'reserveUser', 'reserveWord', 'search_cache_size', 'search_floodcontrol_time', 'search_max_results', 'search_results_per_page', 'search_weight_age', 'search_weight_first_message', 'search_weight_frequency', 'search_weight_length', 'search_weight_subject', 'secureCookies', 'send_validation_onChange', 'send_welcomeEmail', 'settings_updated', 'signature_settings', 'smtp_host', 'smtp_password', 'smtp_port', 'smtp_username', 'spamWaitTime', 'theme_allow', 'theme_default', 'theme_guests', 'timeLoadPageEnable', 'time_format', 'time_offset', 'titlesEnable', 'todayMod', 'topicSummaryPosts', 'totalMembers', 'totalMessages', 'totalTopics', 'trackStats', 'unapprovedMembers', 'userLanguage', 'use_subdirectories_for_attachments', 'visual_verification_type', 'warning_mute', 'warning_settings', 'warning_watch', 'who_enabled', 'xmlnews_enable', 'xmlnews_maxlen']
+					'dir' => '%dir',
+					'url' => '%url',
+					'directory' => '%directory',
+					'integrate' => 'integrate%'
 				],
 			],
 		];
 	}
 
-	public static string	$convertStep30info = 'Converting smileys (Part 1)';
-	public static function	 convertStep30(): array
+	public static string	$convertStep37info = 'Converting smileys (Part 1)';
+	public static function	 convertStep37(): array
 	{
 		return [
 			'purge' => [
@@ -968,8 +1144,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep31info = 'Converting smileys (Part 2)';
-	public static function	 convertStep31Custom(): void
+	public static string	$convertStep38info = 'Converting smileys (Part 2)';
+	public static function	 convertStep38Custom(): void
 	{
 		$currentStart = Converter::getVar('currentStart');
 
@@ -1023,8 +1199,8 @@ class elkarte11x_to_smf extends ConverterBase
 			);
 	}
 
-	public static string	$convertStep32info = 'Converting smileys (Part 3)';
-	public static function	 convertStep32Custom(): void
+	public static string	$convertStep39info = 'Converting smileys (Part 3)';
+	public static function	 convertStep39Custom(): void
 	{
 		$currentStart = Converter::getVar('currentStart');
 
@@ -1038,12 +1214,6 @@ class elkarte11x_to_smf extends ConverterBase
 		);
 		list($from_smileys_dir) = ConverterDb::fetch_row($result);
 		ConverterDb::free_result($result);
-
-		// Try to correct a from path.
-		$from_smileys_dir = self::checkAndFixPath($from_smileys_dir);
-
-		if (!file_exists($from_smileys_dir))
-			Converter::skip('Smileys source directory does not exist or is not writable');
 
 		$result = ConverterDb::query('
 			SELECT value
@@ -1101,8 +1271,8 @@ class elkarte11x_to_smf extends ConverterBase
 		}
 	}
 
-	public static string	$convertStep33info = 'Converting arachnids';
-	public static function	 convertStep33(): array
+	public static string	$convertStep40info = 'Converting arachnids';
+	public static function	 convertStep40(): array
 	{
 		return [
 			'purge' => [
@@ -1123,8 +1293,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep34info = 'Converting subscriptions';
-	public static function	 convertStep34(): array
+	public static string	$convertStep41info = 'Converting subscriptions';
+	public static function	 convertStep41(): array
 	{
 		return [
 			'purge' => [
@@ -1144,8 +1314,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep35info = 'Converting log actions';
-	public static function	 convertStep35(): array
+	public static string	$convertStep42info = 'Converting log actions';
+	public static function	 convertStep42(): array
 	{
 		return [
 			'purge' => [
@@ -1166,8 +1336,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep36info = 'Converting log activity';
-	public static function	 convertStep36(): array
+	public static string	$convertStep43info = 'Converting log activity';
+	public static function	 convertStep43(): array
 	{
 		return [
 			'purge' => [
@@ -1189,8 +1359,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep37info = 'Converting log banned';
-	public static function	 convertStep37(): array
+	public static string	$convertStep44info = 'Converting log banned';
+	public static function	 convertStep44(): array
 	{
 		return [
 			'purge' => [
@@ -1211,8 +1381,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep38info = 'Converting log boards';
-	public static function	 convertStep38(): array
+	public static string	$convertStep45info = 'Converting log boards';
+	public static function	 convertStep45(): array
 	{
 		return [
 			'purge' => [
@@ -1233,8 +1403,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep39info = 'Converting log comments';
-	public static function	 convertStep39(): array
+	public static string	$convertStep46info = 'Converting log comments';
+	public static function	 convertStep46(): array
 	{
 		return [
 			'purge' => [
@@ -1255,8 +1425,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep40info = 'Converting log digest';
-	public static function	 convertStep40(): array
+	public static string	$convertStep47info = 'Converting log digest';
+	public static function	 convertStep47(): array
 	{
 		return [
 			'purge' => [
@@ -1277,8 +1447,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep41info = 'Converting log group requests';
-	public static function	 convertStep41(): array
+	public static string	$convertStep48info = 'Converting log group requests';
+	public static function	 convertStep48(): array
 	{
 		return [
 			'purge' => [
@@ -1299,8 +1469,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep42info = 'Converting log mark read';
-	public static function	 convertStep42(): array
+	public static string	$convertStep49info = 'Converting log mark read';
+	public static function	 convertStep49(): array
 	{
 		return [
 			'purge' => [
@@ -1321,8 +1491,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep43info = 'Converting log moderator notices';
-	public static function	 convertStep43(): array
+	public static string	$convertStep50info = 'Converting log moderator notices';
+	public static function	 convertStep50(): array
 	{
 		return [
 			'purge' => [
@@ -1343,8 +1513,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep44info = 'Converting log notify';
-	public static function	 convertStep44(): array
+	public static string	$convertStep51info = 'Converting log notify';
+	public static function	 convertStep51(): array
 	{
 		return [
 			'purge' => [
@@ -1365,8 +1535,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep45info = 'Converting log reported';
-	public static function	 convertStep45(): array
+	public static string	$convertStep52info = 'Converting log reported';
+	public static function	 convertStep52(): array
 	{
 		return [
 			'purge' => [
@@ -1387,8 +1557,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep46info = 'Converting log reported comments';
-	public static function	 convertStep46(): array
+	public static string	$convertStep53info = 'Converting log reported comments';
+	public static function	 convertStep53(): array
 	{
 		return [
 			'purge' => [
@@ -1409,8 +1579,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep47info = 'Converting log spider hits';
-	public static function	 convertStep47(): array
+	public static string	$convertStep54info = 'Converting log spider hits';
+	public static function	 convertStep54(): array
 	{
 		return [
 			'purge' => [
@@ -1431,8 +1601,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep48info = 'Converting log spider stats';
-	public static function	 convertStep48(): array
+	public static string	$convertStep55info = 'Converting log spider stats';
+	public static function	 convertStep55(): array
 	{
 		return [
 			'purge' => [
@@ -1452,8 +1622,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep49info = 'Converting log subscribed';
-	public static function	 convertStep49(): array
+	public static string	$convertStep56info = 'Converting log subscribed';
+	public static function	 convertStep56(): array
 	{
 		return [
 			'purge' => [
@@ -1473,8 +1643,8 @@ class elkarte11x_to_smf extends ConverterBase
 		];
 	}
 
-	public static string	$convertStep50info = 'Converting log topics';
-	public static function	 convertStep50(): array
+	public static string	$convertStep57info = 'Converting log topics';
+	public static function	 convertStep57(): array
 	{
 		return [
 			'purge' => [

@@ -503,6 +503,7 @@ class Converter
 		$this->template = 'SelectScript';
 
 		$context['converter_scripts'] = $this->findConverterScripts();
+		sort($context['converter_scripts']);
 
 		// If we found only one, we can skip this step.
 		if (count($context['converter_scripts']) == 1)
@@ -541,7 +542,10 @@ class Converter
 
 		// Nothing yet, don't try to validate stuff.
 		if (empty($this->getRequestVar('convertPathFrom')) || empty($this->getRequestVar('convertDbPass')))
+		{
+			$this->showSteps = true;
 			return;
+		}
 
 		$found = empty($this->script['settings']);
 		if ($this->getRequestVar('convertPathFrom') != '' && isset($this->script['settings']))
@@ -1620,7 +1624,7 @@ class ConverterBase
 	/*
 	 * Connect to the from/source system database
 	 */
-	public static function connectDb(): object
+	public static function connectDb()
 	{
 	}
 
@@ -1715,7 +1719,7 @@ class ConverterBase
 	 * @param string $msg The data we will convert.
 	 * @return string The string with as much bbc conversion as possible done.
 	 */
-	public static function hmtl_to_bbc(string $ddata): string
+	public static function hmtl_to_bbc(string $data): string
 	{
 		global $smcFunc;
 		return $smcFunc['htmlspecialchars'](strip_tags(html_to_bbc($data)));
@@ -1981,6 +1985,36 @@ class ConverterBase
 		ConverterDb::free_result($result);
 
 		return empty($id_attach) ? 1 : $id_attach;
+	}
+
+	/*
+	 * This is a useful tool that will determine how the base directory has shifted if the forum was moved
+	 */
+	public static function checkAndFixPath(string $path, string $basepath = ''): string
+	{
+		if (empty($basepath))
+			$basepath = static::$basepath;
+
+		$open_base_dir = ini_get('open_basedir');
+		if (!empty($open_base_dir))
+		{
+			$exists = false;
+			foreach ((explode(':', ini_get('open_basedir')) ?? []) as $dir)
+			{
+				if (strpos($dir, $path) !== false && is_writable($dir))
+				{
+					$exists = true;
+					break;
+				}
+			}
+		}
+		else
+			$exists = true;
+
+		if ($exists && file_exists($path))
+			return $path;
+
+		return str_replace($basepath, Converter::getVar('convertPathFrom') . (static::$frompathappend ?? ''), $path) ;
 	}
 }
 
@@ -2875,8 +2909,8 @@ class CleanupDatabase extends ConverterBase
 		{
 			ConverterDb::insert(
 				'{db_prefix}categories',
-				['name' => 'string'],
-				['General Category'],
+				['name'],
+				[['name' => 'General Category']],
 				['name']
 			);
 			$catch_cat = ConverterDb::insert_id('{db_prefix}categories');
@@ -3493,7 +3527,7 @@ function template_convert_ConvertOptions()
 		echo '
 		</dl>';
 	}
-	elseif (!empty($context['steps']))
+	elseif (!empty($context['steps']) && Converter::getVar('showSteps') ?? false)
 	{
 			echo '
 		<h2>', $txt['convert_conversion_steps'], '</h2>

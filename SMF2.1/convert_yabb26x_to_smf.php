@@ -24,17 +24,20 @@ if (basename($_SERVER['PHP_SELF']) === basename(__FILE__))
 		die('This tool requires convert.php to function, please place convert.php in the same directory as this script.');
 }
 
-class yabb25x_to_smf extends ConverterBase
+class yabb26x_to_smf extends ConverterBase
 {
+	public static string $basepath = '';
+	public static string $frompathappend = '';
+
 	public static bool $purge = false;
 
 	public static function info(): array
 	{
 		return [
-			'name' => 'YaBB 2.5',
+			'name' => 'YaBB 2.6',
 			'version' => 'SMF 2.1.*',
 			'flatfile' => true,
-			'settings' => ['/Paths.pl', '/Variables/Paths.pl'],
+			'settings' => ['/Paths.pm', '/Variables/Paths.pm'],
 			'parameters' => [
 				[
 					'id' => 'purge',
@@ -98,13 +101,13 @@ class yabb25x_to_smf extends ConverterBase
 	{
 		global $yabb;
 
-		if (empty(Converter::getVar('convertPathFrom')) || (!file_exists(Converter::getVar('convertPathFrom') . '/Paths.pl') && !file_exists(Converter::getVar('convertPathFrom') . '/Variables/Paths.pl')))
+		if (empty(Converter::getVar('convertPathFrom')) || (!file_exists(Converter::getVar('convertPathFrom') . '/Paths.pm') && !file_exists(Converter::getVar('convertPathFrom') . '/Variables/Paths.pm')))
 			return;
 
-		if (file_exists(Converter::getVar('convertPathFrom') . '/Paths.pl'))
-			$data = file(Converter::getVar('convertPathFrom') . '/Paths.pl');
+		if (file_exists(Converter::getVar('convertPathFrom') . '/Paths.pm'))
+			$data = file(Converter::getVar('convertPathFrom') . '/Paths.pm');
 		else
-			$data = file(Converter::getVar('convertPathFrom') . '/Variables/Paths.pl');
+			$data = file(Converter::getVar('convertPathFrom') . '/Variables/Paths.pm');
 		foreach ($data as $line)
 		{
 			$line = trim($line);
@@ -124,7 +127,7 @@ class yabb25x_to_smf extends ConverterBase
 			if (substr($yabb[$path], 0, 9) == '$boarddir')
 				$yabb[$path] = str_replace('$boarddir', $yabb['boarddir'], $yabb[$path]);
 
-		$data = file($yabb['vardir'] . '/Settings.pl');
+		$data = file($yabb['vardir'] . '/Settings.pm');
 		foreach ($data as $line)
 		{
 			$line = trim($line);
@@ -255,7 +258,7 @@ class yabb25x_to_smf extends ConverterBase
 		$knownGroups = $extraGroups = [];
 		$newbie = false;
 
-		$groups = file($yabb['vardir'] . '/Settings.pl');
+		$groups = file($yabb['vardir'] . '/Settings.pm');
 		foreach ($groups as $i => $group)
 		{
 			if (preg_match('~^\$Group\{\'(Administrator|Global Moderator|Moderator)\'\} = [\'|"]([^|]*)\|(\d*)\|([^|]*)\|([^|]*)~', $group, $match) != 0)
@@ -1398,7 +1401,7 @@ class yabb25x_to_smf extends ConverterBase
 			if (!empty($attachments))
 				ConverterDb::insert(
 					'{to_prefix}attachments',
-					['id_attach' => 'int', 'size' => 'int', 'downloads' => 'int', 'filename' => 'string', 'file_hash' => 'string', 'id_msg' => 'int', 'width' => 'int', 'height' => 'int'],
+					['id_attach', 'size', 'downloads', 'filename', 'file_hash', 'id_msg', 'width', 'height'],
 					$attachments,
 				);
 
@@ -1718,9 +1721,9 @@ class yabb25x_to_smf extends ConverterBase
 				// Asssign the id_member to the poll.
 				while ($row = ConverterDb::fetch_assoc($request))
 				{
-					foreach ($pollVotesBlock as $key => $avlue)
+					foreach ($pollVotesBlock as $key => $value)
 					{
-						if (isset($avlue['member_name']) && $avlue['member_name'] == $row['member_name'])
+						if (isset($value['member_name']) && $value['member_name'] == $row['member_name'])
 						{
 							// Assign id_member
 							$pollVotesBlock[$key]['id_member'] = $row['id_member'];
@@ -1742,9 +1745,9 @@ class yabb25x_to_smf extends ConverterBase
 				// Asssign the id_member to the poll.
 				while ($row = ConverterDb::fetch_assoc($request))
 				{
-					foreach ($pollVotesBlock as $key => $avlue)
+					foreach ($pollVotesBlock as $key => $value)
 					{
-						if (isset($avlue['member_name']) && $avlue['member_name'] == $row['real_name'])
+						if (isset($value['member_name']) && $value['member_name'] == $row['real_name'])
 						{
 							// Assign id_member
 							$pollVotesBlock[$key]['id_member'] = $row['id_member'];
