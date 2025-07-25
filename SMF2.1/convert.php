@@ -1824,7 +1824,7 @@ class ConverterBase
 		if (isset($stepinfo['pre_process']) && is_callable($stepinfo['pre_process']))
 				$stepinfo['pre_process']();
 
-		// FIgure out big our limit is.  This doesn't use $blockSizes as we can more easily just define it in the array of data..
+		// Figure out big our limit is.  This doesn't use $blockSizes as we can more easily just define it in the array of data..
 		$limit = ($stepinfo['process']['limit'] ?? 500) * (Converter::getVar('blockSizeAdjustment') ?? 1.0);
 
 		// Get a progress bar.
@@ -1853,19 +1853,20 @@ class ConverterBase
 		while (true)
 		{
 			// Params we need.
+			$query = $stepinfo['process']['query'];
 			$params = $stepinfo['process']['params'] ?? [];
 
 			// Add a limiter to the query..
 			if (empty($stepinfo['process']['no_limit']))
 			{
-				$stepinfo['process']['query'] .= '
+				$query .= '
 					LIMIT {int:offset}, {int:limit}';
 				$params['offset'] = $currentStart;
 				$params['limit'] = $limit;
 			}
 
 			$result = ConverterDb::query(
-				$stepinfo['process']['query'],
+				$query,
 				$params
 			);
 			$row_count = ConverterDb::num_rows($result);
